@@ -81,9 +81,6 @@ Then specify learning objective:
 
 ```python
 if __name__ == "__main__":
-    if len(sys.argv) <= 1:
-        print("python local_test.py filename")
-
     local_test(course_description = "David want to learn about the history of the United States!")
 ```
 
