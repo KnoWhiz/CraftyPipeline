@@ -1,3 +1,11 @@
 
 Crafty/.env
 *.pyc
+.DS_Store
+Crafty/.DS_Store
+Crafty/pipeline/.DS_Store
+Crafty/pipeline/science/.DS_Store
+.DS_Store
+Crafty/.DS_Store
+Crafty/pipeline/.DS_Store
+Crafty/pipeline/science/.DS_Store

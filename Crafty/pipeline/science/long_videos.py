@@ -1,54 +1,40 @@
 import openai
-import hashlib
 import json
 import os
-import pandas as pd
-from itertools import groupby
-from operator import itemgetter
+import numpy as np
+import re
+import copy
+import subprocess
+import logging
+import fitz
+import requests
+import multiprocessing
+from pydub import AudioSegment
+from moviepy.editor import AudioFileClip, ImageClip, VideoFileClip, concatenate_videoclips
+
+from openai import OpenAI
 from langchain_community.document_loaders import UnstructuredPDFLoader
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
-from dotenv import load_dotenv  # pip install python-dotenv
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-import tiktoken
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain, SequentialChain
-import math
-import random
-import numpy as np
-import scipy.stats as stats
-import re
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain.output_parsers import OutputFixingParser
 from langchain_openai import ChatOpenAI
-from typing import List, Optional, Set
+from langchain.prompts import PromptTemplate
+from langchain_community.callbacks import get_openai_callback
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import copy
-import time
 
 os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/bin/ffmpeg"
 from pipeline.science.api_handler import ApiHandler
 from pipeline.science.doc_handler import DocHandler
 from pipeline.science.prompt_handler import PromptHandler
 from pipeline.science.json_handler import JsonHandler
-import subprocess
-from openai import OpenAI
-import logging
-import fitz  # PyMuPDF
-from moviepy.editor import AudioFileClip, ImageClip, VideoFileClip, concatenate_videoclips
-from pydub import AudioSegment
-import requests
-import multiprocessing
-
-from langchain.prompts import PromptTemplate
-from langchain.output_parsers import ResponseSchema, StructuredOutputParser
-import pandas as pd
-# from langchain.callbacks import get_openai_callback
-from langchain_community.callbacks import get_openai_callback
 
 # Functions for parsing LaTeX content wihtout titles
 def parse_latex_slides(latex_content):
