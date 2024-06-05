@@ -1,5 +1,3 @@
-# Pipeline Service
-
 ## Installation
 
 ```bash
