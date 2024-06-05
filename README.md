@@ -90,3 +90,7 @@ conda activate crafty
 cd "<project_dir>"
 python local_test.py
 ```
+
+## Work flow
+
+The project is started by running local_test.py. Then "generate_videos" in dev_tasks.py will be called. With the steps in generate_videos, we can create chapters (and sections under them) and then notes (for sections under each chapter). After getting the notes, we can take them as material to run VideoProcessor for videos generation.
