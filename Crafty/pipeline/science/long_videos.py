@@ -21,14 +21,10 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.prompts import ChatPromptTemplate
-from langchain.chains import LLMChain, SequentialChain
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain.output_parsers import OutputFixingParser
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from langchain_community.callbacks import get_openai_callback
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/bin/ffmpeg"
 from pipeline.science.api_handler import ApiHandler
@@ -325,8 +321,13 @@ class Long_videos:
                 Requirement 2. Focus on illustration of the concepts and do not use figures or tables etc.
                 Requirement 3. Try to cover as much information in the provided material as you can.
                 """)
-            # chain_1 = prompt_1 | llm | error_parser
-            chain_1 = LLMChain(llm=self.llm_advance, prompt=prompt_1, output_key="full_slides_temp_1")
+            chain_1 = prompt_1 | self.llm_advance | error_parser
+            full_slides_temp_1 = chain_1.invoke({'zero_shot_topic': self.course_description,\
+                                                'notes_set': notes_set,\
+                                                'page_number': self.content_slide_pages,\
+                                                'tex_template': self.slides_template,\
+                                                'chapter': self.chapters_list[notes_set_number],\
+                                                'notes_set_number': notes_set_number})
 
             print("\n")
             prompt_2 = ChatPromptTemplate.from_template(
@@ -341,7 +342,14 @@ class Long_videos:
                 Requirement 3. Focus on illustration of the concepts and do not use figures or tables etc.
                 Requirement 4. Try to cover as much information in the provided material as you can.
                 """)
-            chain_2 = LLMChain(llm=self.llm_advance, prompt=prompt_2, output_key="full_slides_temp_2")
+            chain_2 = prompt_2 | self.llm_advance | error_parser
+            full_slides_temp_2 = chain_2.invoke({'zero_shot_topic': self.course_description,\
+                                                'notes_set': notes_set,\
+                                                'page_number': self.content_slide_pages,\
+                                                'tex_template': self.slides_template,\
+                                                'chapter': self.chapters_list[notes_set_number],\
+                                                'notes_set_number': notes_set_number,\
+                                                'full_slides_temp_1': full_slides_temp_1})
 
             print("\n")
             prompt_3 = ChatPromptTemplate.from_template(
@@ -357,7 +365,14 @@ class Long_videos:
                 Requirement 4. Recheck the tex format to make sure it is correct as a whole.
                 Requirement 5. Build hyperlinks between the outline slide and the corresponding topic slides.
                 """)
-            chain_3 = LLMChain(llm=self.llm_advance, prompt=prompt_3, output_key="full_slides_temp_3")
+            chain_3 = prompt_3 | self.llm_advance | error_parser
+            full_slides_temp_3 = chain_3.invoke({'zero_shot_topic': self.course_description,\
+                                                'notes_set': notes_set,\
+                                                'page_number': self.content_slide_pages,\
+                                                'tex_template': self.slides_template,\
+                                                'chapter': self.chapters_list[notes_set_number],\
+                                                'notes_set_number': notes_set_number,\
+                                                'full_slides_temp_2': full_slides_temp_2})
 
             print("\n")
             prompt_4 = ChatPromptTemplate.from_template(
@@ -377,19 +392,16 @@ class Long_videos:
                 And do not include anything like "```" in response.
                 Reply with the final slides in latex format purely.
                 """)
-            chain_4 = LLMChain(llm=self.llm_advance, prompt=prompt_4, output_key="full_slides")
-
-            fchain = SequentialChain(chains=[chain_1, chain_2, chain_3, chain_4],\
-                                    input_variables=["zero_shot_topic", "notes_set", "page_number", "tex_template", "chapter", "notes_set_number"],\
-                                    output_variables=["full_slides_temp_1", "full_slides_temp_2", "full_slides_temp_3", "full_slides"],\
-                                    verbose=False)
-            response = fchain.invoke({'zero_shot_topic': self.course_description,\
-                                    'notes_set': notes_set,\
-                                    'page_number': self.content_slide_pages + 2,\
-                                    'tex_template': self.slides_template,\
-                                    'chapter': self.chapters_list[notes_set_number],\
-                                    'notes_set_number': notes_set_number})
-            self.full_slides = response["full_slides"]
+            chain_4 = prompt_4 | self.llm_advance | error_parser
+            full_slides = chain_4.invoke({'zero_shot_topic': self.course_description,\
+                                        'notes_set': notes_set,\
+                                        'page_number': self.content_slide_pages + 2,\
+                                        'tex_template': self.slides_template,\
+                                        'chapter': self.chapters_list[notes_set_number],\
+                                        'notes_set_number': notes_set_number,\
+                                        'full_slides_temp_3': full_slides_temp_3})
+            
+            self.full_slides = full_slides
 
             if not os.path.exists(self.long_videos_dir +  f"video_description_chapter_{notes_set_number}.json"):
                 prompt = ChatPromptTemplate.from_template(
@@ -400,16 +412,12 @@ class Long_videos:
                     Lecture slides:
                     ```{full_slides}```
                     """)
-                chain = LLMChain(llm=self.llm_basic, prompt=prompt, output_key="video_description")
-                fchain = SequentialChain(chains=[chain],\
-                                        input_variables=["zero_shot_topic", "chapter", "full_slides"],\
-                                        output_variables=["video_description"],\
-                                        verbose=False)
-                response = fchain.invoke({'zero_shot_topic': self.course_description,\
-                                        'chapter': self.chapters_list[notes_set_number],\
-                                        'full_slides': self.full_slides})
+                chain = prompt | self.llm_basic | error_parser
+                video_description = chain.invoke({'zero_shot_topic': self.course_description,\
+                                                'chapter': self.chapters_list[notes_set_number],\
+                                                'full_slides': self.full_slides})
                 with open(self.long_videos_dir +  f"video_description_chapter_{notes_set_number}.json", 'w') as file:
-                    json.dump(response["video_description"], file, indent=2)
+                    json.dump(video_description, file, indent=2)
 
             # Save the response in a .tex file instead of a .txt file
             with open(self.long_videos_dir + "full_slides_for_"+f'notes_set{notes_set_number}'+".tex", 'w') as file:
@@ -419,6 +427,8 @@ class Long_videos:
     def dalle_image(self, prompt="Crafty", model="dall-e-3", size="1024x1024", quality="standard", notes_set_number=-1, index=0, retry_on_invalid_request=True):
         if(os.path.exists(self.long_videos_dir + f"chapter_{notes_set_number}_dalle_image_{index}.png")):
             return
+        parser = StrOutputParser()
+        error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_advance)
         prompt_1 = ChatPromptTemplate.from_template(
             """
             For concept: ```{input}``` in course: {zero_shot_topic}, chapter: {chapter}.
@@ -426,14 +436,8 @@ class Long_videos:
             Do not include any technical terms, just a simple description.
             Give a graphic description representation of the concept.
             """)
-        chain_1 = LLMChain(llm=self.llm_advance, prompt=prompt_1, output_key="prompt")
-
-        fchain = SequentialChain(chains=[chain_1],\
-                                input_variables=["input", "zero_shot_topic", "chapter"],\
-                                output_variables=["prompt"],\
-                                verbose=False)
-        response = fchain.invoke({'input': prompt, 'zero_shot_topic': self.course_description, 'chapter': self.chapters_list[notes_set_number]})
-        prompt = response["prompt"]
+        chain_1 = prompt_1 | self.llm_advance | error_parser
+        prompt = chain_1.invoke({'input': prompt, 'zero_shot_topic': self.course_description, 'chapter': self.chapters_list[notes_set_number]})
 
         client = openai.OpenAI()
         try:
@@ -447,6 +451,8 @@ class Long_videos:
         except openai.BadRequestError as e:
             if retry_on_invalid_request:
                 print(f"OpenAI API request was invalid, retrying with default prompt: {e}")
+                parser = StrOutputParser()
+                error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_advance)
                 prompt_2 = ChatPromptTemplate.from_template(
                     """
                     For course: {zero_shot_topic}, chapter: {chapter}.
@@ -455,14 +461,9 @@ class Long_videos:
                     Give a graphic description representation of the concept.
                     Since OpenAI API request was invalid for the previous prompt, try to keep the description safe and harmonious.
                     """)
-                chain_2 = LLMChain(llm=self.llm_advance, prompt=prompt_2, output_key="prompt")
+                chain_2 = prompt_2 | self.llm_advance | error_parser
+                prompt = chain_2.invoke({'zero_shot_topic': self.course_description, 'chapter': self.chapters_list[notes_set_number]})
 
-                fchain = SequentialChain(chains=[chain_2],\
-                                        input_variables=["input", "zero_shot_topic", "chapter"],\
-                                        output_variables=["prompt"],\
-                                        verbose=False)
-                response = fchain.invoke({'input': prompt, 'zero_shot_topic': self.course_description, 'chapter': self.chapters_list[notes_set_number]})
-                prompt = response["prompt"]
                 self.dalle_image(prompt="Crafty", model=model, size=size, quality=quality, notes_set_number=notes_set_number, index=index, retry_on_invalid_request=False)
             else:
                 print(f"Retried with default prompt but encountered an error: {e}")
@@ -541,7 +542,7 @@ class Long_videos:
         print("\n\nself.slide_texts: ", self.slide_texts)
 
     def create_scripts(self, notes_set_number=-1):
-        llm = self.llm_advance
+        # llm = self.llm_advance
         llm = self.llm_basic
         # Load the chapters and sections if they exist
         if os.path.exists(self.note_dir + "chapters_and_sections.json"):
@@ -588,6 +589,8 @@ class Long_videos:
                 # 3. If needed you can refer to the previous context of slides: ```{previous_context}``` as a reference.
                 # but this is only for getting smoother transition between slides.
                 if(i == 0):
+                    parser = StrOutputParser()
+                    error_parser = OutputFixingParser.from_llm(parser=parser, llm=llm)
                     prompt_1 = ChatPromptTemplate.from_template(
                         """
                         As a professor teaching chapter: {chapter} in course {zero_shot_topic}.
@@ -597,7 +600,12 @@ class Long_videos:
                         Requirtments:
                         0. Try to be breif and concise.
                         """)
-                    chain_1 = LLMChain(llm=llm, prompt=prompt_1, output_key="scripts_temp_1")
+                    chain_1 = prompt_1 | llm | error_parser
+                    scripts_temp_1 = chain_1.invoke({'zero_shot_topic': self.course_description,\
+                                                    'notes_set': notes_set,\
+                                                    'slide_text': (self.slide_texts)[i],\
+                                                    'outline': (self.slide_texts)[i+1],\
+                                                    'chapter': self.chapters_list[notes_set_number]})
 
                     print("\n")
                     prompt_2 = ChatPromptTemplate.from_template(
@@ -609,21 +617,17 @@ class Long_videos:
                         Requirtments:
                         0. The response should be a fluent colloquial sentences paragraph, from the first word to the last word.
                         """)
-                    chain_2 = LLMChain(llm=llm, prompt=prompt_2, output_key="scripts")
-
-                    fchain = SequentialChain(chains=[chain_1, chain_2],\
-                                            input_variables=["zero_shot_topic", "notes_set", "slide_text", "outline", "previous_context", "chapter", "current_script", "script_length"],\
-                                            output_variables=["scripts"],\
-                                            verbose=False)
-                    response = fchain.invoke({'zero_shot_topic': self.course_description,\
+                    chain_2 = prompt_2 | llm | error_parser
+                    scripts = chain_2.invoke({'zero_shot_topic': self.course_description,\
                                             'notes_set': notes_set,\
                                             'slide_text': (self.slide_texts)[i],\
                                             'outline': (self.slide_texts)[i+1],\
-                                            'previous_context': self.slides,\
                                             'chapter': self.chapters_list[notes_set_number],\
-                                            'current_script': self.scripts,\
-                                            'script_length': self.script_max_words})
+                                            'scripts_temp_1': scripts_temp_1})
+
                 elif(i == 1):
+                    parser = StrOutputParser()
+                    error_parser = OutputFixingParser.from_llm(parser=parser, llm=llm)
                     prompt_1 = ChatPromptTemplate.from_template(
                         """
                         As a professor teaching chapter: {chapter} in course {zero_shot_topic}.
@@ -633,7 +637,11 @@ class Long_videos:
                         Requirtments:
                         0. Try to be breif and concise.
                         """)
-                    chain_1 = LLMChain(llm=llm, prompt=prompt_1, output_key="scripts_temp_1")
+                    chain_1 = prompt_1 | llm | error_parser
+                    scripts_temp_1 = chain_1.invoke({'zero_shot_topic': self.course_description,\
+                                                    'notes_set': notes_set,\
+                                                    'slide_text': (self.slide_texts)[i],\
+                                                    'chapter': self.chapters_list[notes_set_number]})
 
                     print("\n")
                     prompt_2 = ChatPromptTemplate.from_template(
@@ -645,28 +653,27 @@ class Long_videos:
                         Requirtments:
                         0. The response should be a fluent colloquial sentences paragraph, from the first word to the last word.
                         """)
-                    chain_2 = LLMChain(llm=llm, prompt=prompt_2, output_key="scripts")
-
-                    fchain = SequentialChain(chains=[chain_1, chain_2],\
-                                            input_variables=["zero_shot_topic", "notes_set", "slide_text", "outline", "previous_context", "chapter", "current_script", "script_length"],\
-                                            output_variables=["scripts"],\
-                                            verbose=False)
-                    response = fchain.invoke({'zero_shot_topic': self.course_description,\
+                    chain_2 = prompt_2 | llm | error_parser
+                    scripts = chain_2.invoke({'zero_shot_topic': self.course_description,\
                                             'notes_set': notes_set,\
                                             'slide_text': (self.slide_texts)[i],\
-                                            'outline': (self.slide_texts)[i+1],\
-                                            'previous_context': self.slides,\
                                             'chapter': self.chapters_list[notes_set_number],\
-                                            'current_script': self.scripts,\
-                                            'script_length': self.script_max_words})
+                                            'scripts_temp_1': scripts_temp_1})
+
                 elif(i == len(self.slide_texts) - 1):
+                    parser = StrOutputParser()
+                    error_parser = OutputFixingParser.from_llm(parser=parser, llm=llm)
                     prompt_1 = ChatPromptTemplate.from_template(
                         """
                         As a professor teaching chapter: {chapter} in course {zero_shot_topic}.
                         Please generate a brief script (1 or 2 sentences) for a presentation end with slide: ```{slide_text}```.
                         Try to be open and inspiring students to think and ask questions.
                         """)
-                    chain_1 = LLMChain(llm=llm, prompt=prompt_1, output_key="scripts_temp_1")
+                    chain_1 = prompt_1 | llm | error_parser
+                    scripts_temp_1 = chain_1.invoke({'zero_shot_topic': self.course_description,\
+                                                    'notes_set': notes_set,\
+                                                    'slide_text': (self.slide_texts)[i],\
+                                                    'chapter': self.chapters_list[notes_set_number]})
 
                     print("\n")
                     prompt_2 = ChatPromptTemplate.from_template(
@@ -677,20 +684,16 @@ class Long_videos:
                         Requirtments:
                         0. The response should be a fluent colloquial sentences paragraph, from the first word to the last word.
                         """)
-                    chain_2 = LLMChain(llm=llm, prompt=prompt_2, output_key="scripts")
-
-                    fchain = SequentialChain(chains=[chain_1, chain_2],\
-                                            input_variables=["zero_shot_topic", "notes_set", "slide_text", "previous_context", "chapter", "current_script", "script_length"],\
-                                            output_variables=["scripts"],\
-                                            verbose=False)
-                    response = fchain.invoke({'zero_shot_topic': self.course_description,\
+                    chain_2 = prompt_2 | llm | error_parser
+                    scripts = chain_2.invoke({'zero_shot_topic': self.course_description,\
                                             'notes_set': notes_set,\
                                             'slide_text': (self.slide_texts)[i],\
-                                            'previous_context': self.slides,\
                                             'chapter': self.chapters_list[notes_set_number],\
-                                            'current_script': self.scripts,\
-                                            'script_length': self.script_max_words})
+                                            'scripts_temp_1': scripts_temp_1})
+
                 elif(i == len(self.slide_texts) - 2):
+                    parser = StrOutputParser()
+                    error_parser = OutputFixingParser.from_llm(parser=parser, llm=llm)
                     prompt_1 = ChatPromptTemplate.from_template(
                         """
                         As a professor teaching chapter: {chapter} in course {zero_shot_topic}.
@@ -701,7 +704,12 @@ class Long_videos:
                         Requirtments:
                         0. Try to be open and inspiring students to think and ask questions.
                         """)
-                    chain_1 = LLMChain(llm=llm, prompt=prompt_1, output_key="scripts_temp_1")
+                    chain_1 = prompt_1 | llm | error_parser
+                    scripts_temp_1 = chain_1.invoke({'zero_shot_topic': self.course_description,\
+                                                    'notes_set': notes_set,\
+                                                    'slide_text': (self.slide_texts)[i],\
+                                                    'outline': (self.slide_texts)[i+1],\
+                                                    'chapter': self.chapters_list[notes_set_number]})
 
                     print("\n")
                     prompt_2 = ChatPromptTemplate.from_template(
@@ -713,22 +721,18 @@ class Long_videos:
                         Requirtments:
                         0. The response should be a fluent colloquial sentences paragraph, from the first word to the last word.
                         """)
-                    chain_2 = LLMChain(llm=llm, prompt=prompt_2, output_key="scripts")
-
-                    fchain = SequentialChain(chains=[chain_1, chain_2],\
-                                            input_variables=["zero_shot_topic", "notes_set", "slide_text", "outline", "previous_context", "chapter", "current_script", "script_length"],\
-                                            output_variables=["scripts"],\
-                                            verbose=False)
-                    response = fchain.invoke({'zero_shot_topic': self.course_description,\
+                    chain_2 = prompt_2 | llm | error_parser
+                    scripts = chain_2.invoke({'zero_shot_topic': self.course_description,\
                                             'notes_set': notes_set,\
                                             'slide_text': (self.slide_texts)[i],\
                                             'outline': (self.slide_texts)[i+1],\
-                                            'previous_context': self.slides,\
                                             'chapter': self.chapters_list[notes_set_number],\
-                                            'current_script': self.scripts,\
-                                            'script_length': self.script_max_words})
+                                            'scripts_temp_1': scripts_temp_1})
+
                 elif(i != 0 and i != 1 and i != len(self.slide_texts) - 1 and i != len(self.slide_texts) - 2):
                     if(len(self.slide_texts_temp[i]) < 5):
+                        parser = StrOutputParser()
+                        error_parser = OutputFixingParser.from_llm(parser=parser, llm=llm)
                         prompt_1 = ChatPromptTemplate.from_template(
                             """
                             As a professor teaching chapter: {chapter} in course {zero_shot_topic}.
@@ -742,7 +746,13 @@ class Long_videos:
                             2. Provide rich examples and explanations and possible applications for the content when needed.
                             3. The response should be directly talking about the academic content, with no introduction or conclusion (like "Today...", or "Now...", "In a word...").
                             """)
-                        chain_1 = LLMChain(llm=llm, prompt=prompt_1, output_key="scripts_temp_1")
+                        chain_1 = prompt_1 | llm | error_parser
+                        scripts_temp_1 = chain_1.invoke({'zero_shot_topic': self.course_description,\
+                                                        'notes_set': notes_set,\
+                                                        'slide_text': (self.slide_texts)[i],\
+                                                        'next_slide_text': (self.slide_texts)[i+1],\
+                                                        'chapter': self.chapters_list[notes_set_number]})
+
                         print("\n")
                         prompt_2 = ChatPromptTemplate.from_template(
                             """
@@ -753,20 +763,17 @@ class Long_videos:
                             Requirtments:
                             0. The response should be a fluent colloquial sentences paragraph, from the first word to the last word.
                             """)
-                        chain_2 = LLMChain(llm=llm, prompt=prompt_2, output_key="scripts")
-                        fchain = SequentialChain(chains=[chain_1, chain_2],\
-                                                input_variables=["zero_shot_topic", "notes_set", "slide_text", "next_slide_text", "previous_context", "chapter", "current_script", "script_length"],\
-                                                output_variables=["scripts"],\
-                                                verbose=False)
-                        response = fchain.invoke({'zero_shot_topic': self.course_description,\
+                        chain_2 = prompt_2 | llm | error_parser
+                        scripts = chain_2.invoke({'zero_shot_topic': self.course_description,\
                                                 'notes_set': notes_set,\
                                                 'slide_text': (self.slide_texts)[i],\
                                                 'next_slide_text': (self.slide_texts)[i+1],\
-                                                'previous_context': self.slides,\
                                                 'chapter': self.chapters_list[notes_set_number],\
-                                                'current_script': self.scripts,\
-                                                'script_length': self.script_max_words})
+                                                'scripts_temp_1': scripts_temp_1})
+
                     else:
+                        parser = StrOutputParser()
+                        error_parser = OutputFixingParser.from_llm(parser=parser, llm=llm)
                         prompt_1 = ChatPromptTemplate.from_template(
                             """
                             As a professor teaching chapter: {chapter} in course {zero_shot_topic}.
@@ -781,7 +788,12 @@ class Long_videos:
                             2. Provide rich examples and explanations and possible applications for the content when needed.
                             3. The response should be directly talking about the academic content, with no introduction or conclusion (like "Today...", or "Now...", "In a word...").
                             """)
-                        chain_1 = LLMChain(llm=llm, prompt=prompt_1, output_key="scripts_temp_1")
+                        chain_1 = prompt_1 | llm | error_parser
+                        scripts_temp_1 = chain_1.invoke({'zero_shot_topic': self.course_description,\
+                                                        'notes_set': notes_set,\
+                                                        'slide_text': (self.slide_texts)[i],\
+                                                        'chapter': self.chapters_list[notes_set_number]})
+
                         print("\n")
                         prompt_2 = ChatPromptTemplate.from_template(
                             """
@@ -794,20 +806,14 @@ class Long_videos:
                             0. The response should be a fluent colloquial sentences paragraph, from the first word to the last word.
                             1. Remove the first sentence if it is not directly talking about the academic content.
                             """)
-                        chain_2 = LLMChain(llm=llm, prompt=prompt_2, output_key="scripts")
-                        fchain = SequentialChain(chains=[chain_1, chain_2],\
-                                                input_variables=["zero_shot_topic", "notes_set", "slide_text", "previous_context", "chapter", "current_script", "script_length"],\
-                                                output_variables=["scripts"],\
-                                                verbose=False)
-                        response = fchain.invoke({'zero_shot_topic': self.course_description,\
+                        chain_2 = prompt_2 | llm | error_parser
+                        scripts = chain_2.invoke({'zero_shot_topic': self.course_description,\
                                                 'notes_set': notes_set,\
                                                 'slide_text': (self.slide_texts)[i],\
-                                                'previous_context': self.slides,\
                                                 'chapter': self.chapters_list[notes_set_number],\
-                                                'current_script': self.scripts,\
-                                                'script_length': self.script_max_words})
+                                                'scripts_temp_1': scripts_temp_1})
 
-                self.scripts.append(response["scripts"])
+                self.scripts.append(scripts)
                 self.slides.append((self.slide_texts)[i])
                 # self.scripts.append(ast.literal_eval(remove_backticks_and_json_strip_replace(response["scripts"])))
 
@@ -971,8 +977,8 @@ class Long_videos:
         self.create_full_slides(notes_set_number = chapter)  #"notes_set1"
         self.create_scripts(notes_set_number = chapter)  #"notes_set1"
         self.tex_image_generation(notes_set_number = chapter)
-        self.scripts2voice(notes_set_number = chapter)
         self.insert_images_into_latex(notes_set_number = chapter)
+        self.scripts2voice(notes_set_number = chapter)
         self.pdf2image(notes_set_number = chapter)
         self.mp3_to_mp4_and_combine(notes_set_number = chapter)
 

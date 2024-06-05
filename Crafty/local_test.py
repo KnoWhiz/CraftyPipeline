@@ -5,7 +5,7 @@ from pipeline.dev_tasks import generate_videos
 
 def video_generation_params():
     return {
-        "if_long_videos": False,
+        "if_long_videos": True,
         "if_short_videos": False,
         "slide_max_words": 50,
         "script_max_words": 100,
