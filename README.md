@@ -1,3 +1,6 @@
+# Crafty
+Generate lecture videos with a single prompt!
+
 ## Installation
 
 ```bash
