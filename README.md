@@ -172,7 +172,7 @@ After getting all notes, we generate videos will the following steps
 4. **Insert images into TEX file of the slides and compile PDF**
     - Based on MacTex (on Mac)
 5. **Generate audio files (.mp3) for the scripts**
-    - Could be improved with latest TTS progress: https://bytedancespeech.github.io/seedtts_tech_report/#applications-samples
+    - Could be improved with latest TTS progress in the future: https://bytedancespeech.github.io/seedtts_tech_report/#applications-samples
 6. **Convert the full slides PDF to images**
 7. **Convert the audio files to MP4 and combine them**
     - Based on ffmpeg and moviepy.editor
