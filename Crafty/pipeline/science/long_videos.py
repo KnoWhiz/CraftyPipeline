@@ -1001,7 +1001,7 @@ class Long_videos:
         self.scripts2voice(notes_set_number = chapter)
         # Convert the full slides PDF to images
         self.pdf2image(notes_set_number = chapter)
-        # Convert the audio files to MP4 and combine them with the images
+        # Convert the audio files to MP4 and combine them
         self.mp3_to_mp4_and_combine(notes_set_number = chapter)
 
 class VideoProcessor:
