@@ -6,8 +6,6 @@ Generate lecture videos with a single prompt!
 ```bash
 conda create --name crafty python=3.11
 conda activate crafty
-# pip install quart quart-cors langchain openai unstructured pdf2image pdfminer pdfminer.six "langchain[docarray]" tiktoken celery "celery[redis]" gevent eventlet pymongo boto3 scipy chromadb pandas pymupdf langchain_openai langchain_community scikit-learn discord.py
-# pip install moviepy pydub
 pip install -r requirements.txt
 ```
 
@@ -92,3 +90,7 @@ conda activate crafty
 cd "<project_dir>"
 python local_test.py
 ```
+
+## Work flow
+
+The project is started by running local_test.py. Then "generate_videos" in dev_tasks.py will be called. With the steps in generate_videos, we can create chapters (and sections under them) and then notes (for sections under each chapter). After getting the notes, we can take them as material to run VideoProcessor for videos generation.
