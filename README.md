@@ -167,11 +167,16 @@ After getting all notes, we generate videos will the following steps
 
 1. **Create the full slides for the chapter**
 2. **Generate images for the slides with only titles**
+    - Currently have a dummy logic generating images for sub-title slides only.
 3. **Generate scripts for each slide**
 4. **Insert images into TEX file of the slides and compile PDF**
+    - Based on MacTex (on Mac)
 5. **Generate audio files (.mp3) for the scripts**
+    - Could be improved with latest TTS progress: https://bytedancespeech.github.io/seedtts_tech_report/#applications-samples
 6. **Convert the full slides PDF to images**
-7. **Convert the audio files to MP4 and combine them with the images**
+7. **Convert the audio files to MP4 and combine them**
+    - Based on ffmpeg and moviepy.editor
+    - This is when your computer will start to suffer...
 
 ```python
 def create_long_videos(self, chapter=0):
@@ -190,10 +195,16 @@ def create_long_videos(self, chapter=0):
     self.scripts2voice(notes_set_number = chapter)
     # Convert the full slides PDF to images
     self.pdf2image(notes_set_number = chapter)
-    # Convert the audio files to MP4 and combine them with the images
+    # Convert the audio files to MP4 and combine them
     self.mp3_to_mp4_and_combine(notes_set_number = chapter)
 ```
 
-### Time consuming and cost
+For PDF compiling:
+```python
+command = ['/Library/TeX/texbin/xelatex', tex_file_path]
+subprocess.run(command, cwd=working_directory)
+```
+
+## Time consuming and cost
 
 At present, the total time required to generate a script for a chapter video using GPT4 is about 30-40 minutes, and the total time required to generate a script using GPT3.5 is about 10-15 minutes. Among them, the latex generation of ppt takes 2-3 minutes, the script generation of GPT3.5 takes 1-2 minutes, the script generation of GPT4 takes 15-20 minutes, and the voice generation of a 5-6 minute video takes 1-2 minutes. Video synthesis and processing are greatly affected by computer performance and video length, and it is roughly estimated to be about 10-20 minutes. In terms of cost, if GPT4 is used throughout the process to pursue quality, the final video of 16-17 minutes will cost 1.1-1.2 dollars. If GPT3.5 is used for script generation, the video length will be shortened to 5-6 minutes, and the cost will drop to 40-50 cents. If the image generation link is removed, the cost will drop to 30-35 cents. If the voice generation link is removed, the cost will drop to 10-20 cents (mainly from GPT generating slides).
