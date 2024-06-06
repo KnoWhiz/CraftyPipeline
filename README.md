@@ -160,7 +160,7 @@ Next by going through each chapter, we generate notes for sections in parallel:
 ```python
 notes_exp = robust_generate_expansions(llm, sections_list_temp, chapters_name_temp, self.course_name_textbook_chapters["Course name"], max_note_expansion_words, 3, self.regions)
 ```
-All files saved as ```notes_set{i}.json```, with ```i``` is the chapter index.
+All files saved as ```notes_set{i}.json``` under ```/pipeline/test_outputs/notes/<course_id>/```, with ```i``` is the chapter index.
 
 Examples:
 ```
