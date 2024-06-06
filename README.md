@@ -23,7 +23,7 @@ install ffmpeg
 brew install ffmpeg
 ```
 
-Once installed, you can set the IMAGEIO_FFMPEG_EXE environment variable as indicated in your script. This variable points to the FFmpeg executable, which is typically located in /usr/local/bin/ffmpeg on macOS, but the provided script suggests a Homebrew-specific path under /opt/homebrew/bin/ffmpeg. Verify the correct path using:
+Once installed, you can set the ```IMAGEIO_FFMPEG_EXE``` environment variable as indicated in your script. This variable points to the FFmpeg executable, which is typically located in ```/usr/local/bin/ffmpeg``` on macOS, but the provided script suggests a Homebrew-specific path under ```/opt/homebrew/bin/ffmpeg```. Verify the correct path using:
 
 ```bash
 which ffmpeg
