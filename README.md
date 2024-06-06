@@ -90,3 +90,110 @@ python local_test.py
 ## Work flow
 
 The project is started by running local_test.py. Then "generate_videos" in dev_tasks.py will be called. With the steps in generate_videos, we can create chapters (and sections under them) and then notes (for sections under each chapter). After getting the notes, we can take them as material to run VideoProcessor for videos generation.
+
+### local_test.py
+After running local_test.py, we call
+```python
+generate_videos(para)
+```
+imported from 
+```python
+pipeline.dev_tasks
+```
+
+### dev_tasks.py
+Then we go through the work flow:
+1. **Generate chapters:**
+    - mynotes.create_chapters()
+2. **Generate sections (under chapters):**
+    - mynotes.create_sections()
+3. **Generate note for each section (regions defined in para):**
+    - mynotes.create_notes()
+4. **Videos generation for each chapter:**
+    - myfulllongvideos.run_parallel_processing() for processing each chapter in parallel using multiprocessing
+    - myfulllongvideos.run_sequential_processing() for processing each chapter sequentially
+```python
+mynotes = Zeroshot_notes(para)
+mynotes.create_chapters()
+mynotes.create_sections()
+mynotes.create_notes()
+print(f"Time to create notes: {round((time.time() - st) / 60, 0)} mins of the course for the request {para['course_info'] }.")
+
+para['course_id'] = mynotes.course_id
+# print(f"\nCourse ID: {para['course_id']}")
+
+if(para['if_long_videos']):
+    myfulllongvideos = VideoProcessor(para)
+    if(para['if_parallel_processing']):
+        myfulllongvideos.run_parallel_processing()
+    else:
+        myfulllongvideos.run_sequential_processing()
+```
+
+### zeroshot_notes.py
+```course_id``` defined by hashing ```self.course_info```. Output files will be saved in ```/pipeline/test_outputs/<material_type>/<course_id>/```.
+
+For notes generation, we properly format learning topic with
+```python
+_extract_zero_shot_topic(self)
+```
+in format:
+```python
+{
+"context": <what is the context of this course>,
+"level": <what is the level of this course>,
+"subject": <what is the subject of this course>,
+"zero_shot_topic": <what is the zero_shot_topic of this course>
+}
+```
+Then we go through the process of chapters generation
+```python
+create_chapters(self)
+```
+For the list of chapters, generate sections under each chapter in parallel
+```python
+create_sections(self)
+```
+The information about chapters and sections will be saved in ```chapters_and_sections.json``` under ```/pipeline/test_outputs/notes/<course_id>/```.
+
+Next by going through each chapter, we generate notes for sections in parallel:
+```python
+notes_exp = robust_generate_expansions(llm, sections_list_temp, chapters_name_temp, self.course_name_textbook_chapters["Course name"], max_note_expansion_words, 3, self.regions)
+```
+All files saved as ```notes_set{i}.json```, with ```i``` is the chapter index.
+
+### long_videos.py
+After getting all notes, we generate videos will the following steps
+
+1. **Create the full slides for the chapter**
+2. **Generate images for the slides with only titles**
+3. **Generate scripts for each slide**
+4. **Insert images into TEX file of the slides and compile PDF**
+5. **Generate audio files (.mp3) for the scripts**
+6. **Convert the full slides PDF to images**
+7. **Convert the audio files to MP4 and combine them with the images**
+
+```python
+def create_long_videos(self, chapter=0):
+    """
+    Create long videos for each chapter based on the notes set number.
+    """
+    # Create the full slides for the chapter
+    self.create_full_slides(notes_set_number = chapter)  #"notes_set1"
+    # Generate images for the slides with only titles
+    self.create_scripts(notes_set_number = chapter)  #"notes_set1"
+    # Generate scripts for each slide
+    self.tex_image_generation(notes_set_number = chapter)
+    # Insert images into TEX file of the slides and compile PDF
+    self.insert_images_into_latex(notes_set_number = chapter)
+    # Generate audio files for the scripts
+    self.scripts2voice(notes_set_number = chapter)
+    # Convert the full slides PDF to images
+    self.pdf2image(notes_set_number = chapter)
+    # Convert the audio files to MP4 and combine them with the images
+    self.mp3_to_mp4_and_combine(notes_set_number = chapter)
+```
+
+### Time consuming and cost
+
+At present, the total time required to generate a script for a chapter video using GPT4 is about 30-40 minutes, and the total time required to generate a script using GPT3.5 is about 10-15 minutes. Among them, the latex generation of ppt takes 2-3 minutes, the script generation of GPT3.5 takes 1-2 minutes, the script generation of GPT4 takes 15-20 minutes, and the voice generation of a 5-6 minute video takes 1-2 minutes. Video synthesis and processing are greatly affected by computer performance and video length, and it is roughly estimated to be about 10-20 minutes. In terms of cost, if GPT4 is used throughout the process to pursue quality, the final video of 16-17 minutes will cost 1.1-1.2 dollars. If GPT3.5 is used for script generation, the video length will be shortened to 5-6 minutes, and the cost will drop to 40-50 cents. If the image generation link is removed, the cost will drop to 30-35 cents. If the voice generation link is removed, the cost will drop to 10-20 cents (mainly from GPT generating slides).
