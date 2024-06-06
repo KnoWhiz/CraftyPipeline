@@ -909,7 +909,7 @@ class Long_videos:
             # For higher resolution, you might use 2.0 (144 dpi) or higher.
             zoom = 8.0  # Adjust this factor to get higher resolution images.
             mat = fitz.Matrix(zoom, zoom)  # The transformation matrix for scaling.
-            
+
             pix = page.get_pixmap(matrix=mat)  # Use the matrix in get_pixmap
             image_path = self.long_videos_dir + f"image_{page_number}_chapter_{notes_set_number}.png"
             pix.save(image_path)
@@ -989,12 +989,19 @@ class Long_videos:
         """
         Create long videos for each chapter based on the notes set number.
         """
+        # Create the full slides for the chapter
         self.create_full_slides(notes_set_number = chapter)  #"notes_set1"
+        # Generate images for the slides with only titles
         self.create_scripts(notes_set_number = chapter)  #"notes_set1"
+        # Generate scripts for each slide
         self.tex_image_generation(notes_set_number = chapter)
+        # Insert images into TEX file of the slides and compile PDF
         self.insert_images_into_latex(notes_set_number = chapter)
+        # Generate audio files for the scripts
         self.scripts2voice(notes_set_number = chapter)
+        # Convert the full slides PDF to images
         self.pdf2image(notes_set_number = chapter)
+        # Convert the audio files to MP4 and combine them with the images
         self.mp3_to_mp4_and_combine(notes_set_number = chapter)
 
 class VideoProcessor:
