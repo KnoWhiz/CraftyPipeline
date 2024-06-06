@@ -350,7 +350,7 @@ class Zeroshot_notes:
                 json.dump(data_temp, json_file, indent=4)
         return data_temp
 
-    def create_notes(self, qform_expansion = 'explain_example'):
+    def create_notes(self):
         # llm = self.llm_advance
         if(self.if_advanced_model):
             llm = self.llm_advance
