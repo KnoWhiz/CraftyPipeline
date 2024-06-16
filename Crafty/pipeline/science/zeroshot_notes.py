@@ -17,13 +17,11 @@ from pipeline.science.json_handler import JsonHandler
 
 def dict_to_xml(tag, d):
     """
-    Helper function dict_to_xml
-    Turn a dictionary into an XML tree.
-    Handles cases where dict elements can be XML trees.
+    Convert a dictionary into an XML tree where keys are the XML element tags.
     """
     def build_element(element, dictionary):
         """
-        Build an XML element from a dictionary.
+        Build an XML element from a dictionary where keys are the XML element tags.
         """
         for key, val in dictionary.items():
             if isinstance(val, ET.Element):
@@ -103,19 +101,22 @@ def nest_dict_to_xml(data):
 
 # Expansion generation
 async def generate_expansions(llm, sections, chapter_name, course_name, expansion_length, regions = ["Overview", "Explanations"]):
-    def generate_xml_elements(elements):
+    def generate_xml_elements(section, elements):
         """
         Generate XML elements for the given list of elements.
         Take this as an example in the prompt.
         """
-        root = ET.Element(str("keyword_expansions"))  # Create a root element with the cleaned chapter name
+        section_string = re.sub(r'[^\w\s]', '', str(section))  # Remove any character that is not a word character or whitespace
+        section_string = section_string.replace(':', '')  # Explicitly remove colons
+        section_string = section_string.replace(' ', '_')  # Replace spaces with underscores
+        root = ET.Element(str(section_string))  # Create a root element with the cleaned chapter name
         for element in elements:
             content = f'content for {element} here'
             child = ET.SubElement(root, element)
             child.text = content
         xml_str = ET.tostring(root, encoding='unicode', method='xml')
         return xml_str
-    output_instructions = generate_xml_elements(regions)
+    # output_instructions = generate_xml_elements(regions)
 
     inputs = [{
                 "course_name": course_name,
@@ -123,7 +124,7 @@ async def generate_expansions(llm, sections, chapter_name, course_name, expansio
                 "section": section,
                 "expansion_length": expansion_length,
                 "regions": regions,
-                "output_instructions": output_instructions,
+                "output_instructions": generate_xml_elements(section, regions),
             } for section in sections]
     # parser = StrOutputParser()
     parser = XMLOutputParser()
@@ -148,7 +149,7 @@ async def generate_expansions(llm, sections, chapter_name, course_name, expansio
     return dict(zip(sections, final_roots))
 
 # Expansion generation with given number of attempts
-def robust_generate_expansions(llm, sections, chapter_name, course_name, expansion_length, max_attempts = 3, regions = ["Overview", "Explanations"]):
+def robust_generate_expansions(llm, sections, chapter_name, course_name, expansion_length, max_attempts = 5, regions = ["Overview", "Explanations"]):
     attempt = 0
     while attempt < max_attempts:
         try:
@@ -198,7 +199,7 @@ async def generate_sections(llm, zero_shot_topic, chapter_list, sections_per_cha
 
     return dict(zip(chapter_list, results))
 
-def robust_generate_sections(llm, zero_shot_topic, chapter_list, sections_per_chapter, max_attempts = 3):
+def robust_generate_sections(llm, zero_shot_topic, chapter_list, sections_per_chapter, max_attempts = 5):
     attempt = 0
     while attempt < max_attempts:
         try:
@@ -424,7 +425,7 @@ class Zeroshot_notes:
                 sections_list_temp = self.sections_list[i]
 
                 if not os.path.exists(self.note_dir + f'notes_set{i}.xml'):
-                    notes_exp = robust_generate_expansions(llm, sections_list_temp, chapters_name_temp, self.course_name_textbook_chapters["Course name"], max_note_expansion_words, 3, self.regions)
+                    notes_exp = robust_generate_expansions(llm, sections_list_temp, chapters_name_temp, self.course_name_textbook_chapters["Course name"], max_note_expansion_words, 5, self.regions)
 
                     # Convert notes_exp to XML format
                     notes_exp_xml = dict_to_xml('notes_expansion', notes_exp)
