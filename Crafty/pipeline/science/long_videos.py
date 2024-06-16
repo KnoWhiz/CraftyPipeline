@@ -278,10 +278,18 @@ class Long_videos:
             return
 
         self.slides_template = self._load_slides_template()
-        directory = self.note_dir + f'notes_set{notes_set_number}.json'
+
+        # directory = self.note_dir + f'notes_set{notes_set_number}.json'
+        # if os.path.exists(directory):
+        #     with open(directory, 'r') as json_file:
+        #         notes_set = json.load(json_file)
+        # else:
+        #     notes_set = self.full_notes_set
+
+        directory = self.note_dir + f'notes_set{notes_set_number}.xml'
         if os.path.exists(directory):
-            with open(directory, 'r') as json_file:
-                notes_set = json.load(json_file)
+            with open(directory, 'r') as xml_file:
+                notes_set = xml_file.read()
         else:
             notes_set = self.full_notes_set
 
@@ -565,10 +573,18 @@ class Long_videos:
             return
 
         self.slides_template = self._load_slides_template()
-        directory = self.note_dir + f'notes_set{notes_set_number}.json'
+
+        # directory = self.note_dir + f'notes_set{notes_set_number}.json'
+        # if os.path.exists(directory):
+        #     with open(directory, 'r') as json_file:
+        #         notes_set = json.load(json_file)
+        # else:
+        #     notes_set = self.full_notes_set
+
+        directory = self.note_dir + f'notes_set{notes_set_number}.xml'
         if os.path.exists(directory):
-            with open(directory, 'r') as json_file:
-                notes_set = json.load(json_file)
+            with open(directory, 'r') as xml_file:
+                notes_set = xml_file.read()
         else:
             notes_set = self.full_notes_set
 

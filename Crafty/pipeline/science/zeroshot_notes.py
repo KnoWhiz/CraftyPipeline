@@ -1,97 +1,155 @@
+import re
 import hashlib
 import json
 import os
-import pandas as pd
-import time
 import asyncio
+from xml.etree.ElementTree import ElementTree
+import xml.etree.ElementTree as ET
 
-# from langchain.prompts import ChatPromptTemplate
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.callbacks import get_openai_callback
-from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
+from langchain_core.output_parsers import JsonOutputParser, StrOutputParser, XMLOutputParser
 from langchain.output_parsers import OutputFixingParser
-from langchain_core.pydantic_v1 import BaseModel, Field
-from typing import List, Dict, Any, Optional
-from langchain_core.runnables import RunnableParallel
 
 from pipeline.science.api_handler import ApiHandler
 from pipeline.science.doc_handler import DocHandler
 from pipeline.science.prompt_handler import PromptHandler
 from pipeline.science.json_handler import JsonHandler
 
-# Helper functions
-def format_list_to_string(strings):
+def dict_to_xml(tag, d):
     """
-    Example:
-    example_list = ["example 1", "example 2", "example 3", "example 4"]
-    formatted_string = format_list_to_string(example_list)
-    print(formatted_string)
+    Convert a dictionary into an XML tree where keys are the XML element tags.
     """
-    return "\n".join(f"{index + 1}. {item}" for index, item in enumerate(strings))
+    def build_element(element, dictionary):
+        """
+        Build an XML element from a dictionary where keys are the XML element tags.
+        """
+        for key, val in dictionary.items():
+            if isinstance(val, ET.Element):
+                child = val
+            else:
+                child = ET.Element(key)
+                if isinstance(val, dict):
+                    build_element(child, val)
+                elif isinstance(val, list):
+                    for sub_item in val:
+                        if isinstance(sub_item, dict):
+                            sub_child = ET.Element(key)
+                            build_element(sub_child, sub_item)
+                            child.append(sub_child)
+                        else:
+                            sub_child = ET.Element('item')
+                            sub_child.text = str(sub_item)
+                            child.append(sub_child)
+                else:
+                    child.text = str(val)
+            element.append(child)
 
-# Helper functions
-def format_expansion(data):
+    elem = ET.Element(tag)
+    build_element(elem, d)
+    return elem
+
+def nest_dict_to_xml(data):
     """
-    Processes the given data to convert any lists into formatted strings.
-    Example:
-    with open("1.json", 'r') as json_file:
-        data_temp = json.load(json_file)
-    formatted_data = format_expansion(data_temp)
-    with open("1.json", 'w') as json_file:
-        json.dump(formatted_data, json_file, indent=4)
+    Helper function dict_to_xml
+    Convert a list of dictionaries to an XML tree.
+    Handles nested dictionaries and lists.
     """
-    def convert_lists(item):
-        if isinstance(item, list):
-            return format_list_to_string(item)
-        elif isinstance(item, dict):
-            return {key: convert_lists(value) for key, value in item.items()}
-        else:
-            return item
-    return {key: convert_lists(value) for key, value in data.items()}
+    final_strings = []
+    final_roots = []
+
+    def simple_dict_to_xml(tag, d):
+        """
+        Turn a simple dict of key/value pairs into XML
+        """
+        elem = ET.Element(tag)
+        for key, val in d.items():
+            if isinstance(val, dict):
+                child = simple_dict_to_xml(key, val)
+                elem.append(child)
+            elif isinstance(val, list):
+                for sub_item in val:
+                    if isinstance(sub_item, dict):
+                        sub_elem = simple_dict_to_xml(key, sub_item)
+                        elem.append(sub_elem)
+            else:
+                child = ET.Element(key)
+                child.text = str(val).strip()
+                elem.append(child)
+
+        return elem
+
+    root = ET.Element('root')
+    for item in data:
+        if isinstance(item, dict):
+            for key, val in item.items():
+                if isinstance(val, dict):
+                    elem = simple_dict_to_xml(key, val)
+                elif isinstance(val, list):
+                    elem = ET.Element(key)
+                    for sub_item in val:
+                        if isinstance(sub_item, dict):
+                            sub_elem = simple_dict_to_xml('item', sub_item)
+                            elem.append(sub_elem)
+                else:
+                    elem = ET.Element(key)
+                    elem.text = str(val).strip()
+                root.append(elem)
+            final_strings.append(ET.tostring(root, encoding='unicode'))
+            final_roots.append(root)
+    
+    return final_roots
 
 # Expansion generation
 async def generate_expansions(llm, sections, chapter_name, course_name, expansion_length, regions = ["Overview", "Explanations"]):
-    def format_string(regions):
-        json_content = "\n".join([f'\"{region}\": \"<content of {region} for the given section here>\",' for region in regions])
-        json_format_string = f"""
-        ----------------
-        ```json
-        {{
-            {json_content.rstrip(',')}
-        }}
-        ```
-        ----------------
+    def generate_xml_elements(section, elements):
         """
-        return json_format_string
-    json_format_string = format_string(regions)
+        Generate XML elements for the given list of elements.
+        Take this as an example in the prompt.
+        """
+        section_string = re.sub(r'[^\w\s]', '', str(section))  # Remove any character that is not a word character or whitespace
+        section_string = section_string.replace(':', '')  # Explicitly remove colons
+        section_string = section_string.replace(' ', '_')  # Replace spaces with underscores
+        root = ET.Element(str(section_string))  # Create a root element with the cleaned chapter name
+        for element in elements:
+            content = f'content for {element} here'
+            child = ET.SubElement(root, element)
+            child.text = content
+        xml_str = ET.tostring(root, encoding='unicode', method='xml')
+        return xml_str
+    # output_instructions = generate_xml_elements(regions)
+
     inputs = [{
                 "course_name": course_name,
                 "chapter_name": chapter_name,
                 "section": section,
                 "expansion_length": expansion_length,
-                "json_format_string": json_format_string,
+                "regions": regions,
+                "output_instructions": generate_xml_elements(section, regions),
             } for section in sections]
-    parser = JsonOutputParser()
+    # parser = StrOutputParser()
+    parser = XMLOutputParser()
     error_parser = OutputFixingParser.from_llm(parser=parser, llm=llm)
     prompt = ChatPromptTemplate.from_template(
         """
         Course name: {course_name}
         Chapter name: {chapter_name}
-        Your task is to provide an expansion for the given section.
-        section: {section}
+        Your task is to provide expansions covering regions: {regions} for the given section: {section}
+        Format the output in XML format as follows:
+        ----------------
+        {output_instructions}
+        ----------------
         Max words for expansion: {expansion_length}
-        It should formated as json:
-        {json_format_string}
         """
     )
     chain = prompt | llm | error_parser
-    # asyncio.run(chain.abatch(inputs))
     results = await chain.abatch(inputs)
 
-    return dict(zip(sections, results))
+    final_roots = nest_dict_to_xml(results)
+
+    return dict(zip(sections, final_roots))
 
 # Expansion generation with given number of attempts
-def robust_generate_expansions(llm, sections, chapter_name, course_name, expansion_length, max_attempts = 3, regions = ["Overview", "Explanations"]):
+def robust_generate_expansions(llm, sections, chapter_name, course_name, expansion_length, max_attempts = 5, regions = ["Overview", "Explanations"]):
     attempt = 0
     while attempt < max_attempts:
         try:
@@ -137,12 +195,11 @@ async def generate_sections(llm, zero_shot_topic, chapter_list, sections_per_cha
         """
     )
     chain = prompt | llm | error_parser
-    # asyncio.run(chain.abatch(inputs))
     results = await chain.abatch(inputs)
 
     return dict(zip(chapter_list, results))
 
-def robust_generate_sections(llm, zero_shot_topic, chapter_list, sections_per_chapter, max_attempts = 3):
+def robust_generate_sections(llm, zero_shot_topic, chapter_list, sections_per_chapter, max_attempts = 5):
     attempt = 0
     while attempt < max_attempts:
         try:
@@ -239,15 +296,12 @@ class Zeroshot_notes:
 
     def create_chapters(self):
         llm = self.llm_advance
-        # llm = self.llm_basic
         file_path = self.course_meta_dir +  "course_name_textbook_chapters.json"
         if os.path.exists(file_path):
             with open(file_path, 'r') as file:
                 self.course_name_textbook_chapters = json.load(file)
-                # self.course_name_textbook_chapters = file.read()
 
         else:
-            # Send the prompt to the API and get response
             parser = JsonOutputParser()
             error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
             prompt = ChatPromptTemplate.from_template(
@@ -257,6 +311,7 @@ class Zeroshot_notes:
                 Please work through the following steps:
                 1. Find 3 most popular textbooks about this course topic, note down it as ```textbook and author```.
                 2. Based on these textbooks, come up with at most 10 and at least 5 learning sessions that the students can learn the entire course step by step.
+                3. In chapter name, mark the chapter numbers.
                 The output format should be json as follows:
                 ```json
                 {{
@@ -292,7 +347,6 @@ class Zeroshot_notes:
 
     def create_sections(self):
         llm = self.llm_advance
-        # llm = self.llm_basic
         self.create_chapters()
 
         if os.path.exists(self.note_dir + "chapters_and_sections.json"):
@@ -351,13 +405,11 @@ class Zeroshot_notes:
         return data_temp
 
     def create_notes(self):
-        # llm = self.llm_advance
         if(self.if_advanced_model):
             llm = self.llm_advance
         else:
             llm = self.llm_basic
         max_note_expansion_words = self.max_note_expansion_words
-        full_notes_set = []
 
         if os.path.exists(self.note_dir + "chapters_and_sections.json"):
             with open(self.note_dir + "chapters_and_sections.json", 'r') as json_file:
@@ -367,44 +419,25 @@ class Zeroshot_notes:
         else:
             self.create_sections()
 
-        try:
-            # TODO: Try to generate the full notes set
-            raise Exception("Test exception, will replace with actual code")
-        except Exception as e:
-            # If the full notes set generation fails, go back to the previous steps and try again
-            print(f"Error generating full notes set: {e}") # Log the error
-            for i in range(len(self.chapters_list)):
-                if os.path.exists(self.note_dir +  f'notes_set{i}.json'):
-                    with open(self.note_dir + f'notes_set{i}.json', 'r') as file:
-                        notes = json.load(file)
-                        # notes_set_temp = json.load(file)
-                        full_notes_set.append(notes)
-                else:
-                    chapters_name_temp = self.chapters_list[i]
-                    sections_list_temp = self.sections_list[i]
+        for i in range(len(self.chapters_list)):
+            if not os.path.exists(self.note_dir + f'notes_set{i}.xml'):
+                chapters_name_temp = self.chapters_list[i]
+                sections_list_temp = self.sections_list[i]
 
-                    if os.path.exists(self.note_dir + f'notes_set_exp{i}.json'):
-                        with open(self.note_dir + f'notes_set_exp{i}.json', 'r') as file:
-                            notes_exp = json.load(file)
-                    else:
-                        try:
-                            notes_exp = robust_generate_expansions(llm, sections_list_temp, chapters_name_temp, self.course_name_textbook_chapters["Course name"], max_note_expansion_words, 3, self.regions)
-                        except Exception as e:
-                            print(f"Error generating expansions for chapter {chapters_name_temp}: {e}")
-                            continue  # Skip this iteration and proceed with the next chapter
+                if not os.path.exists(self.note_dir + f'notes_set{i}.xml'):
+                    notes_exp = robust_generate_expansions(llm, sections_list_temp, chapters_name_temp, self.course_name_textbook_chapters["Course name"], max_note_expansion_words, 5, self.regions)
 
-                    notes = format_expansion(notes_exp)
-                    full_notes_set.append(notes)
-                    with open(self.note_dir + f'notes_set_exp{i}.json', 'w') as file:
-                        json.dump(notes_exp, file, indent=2)
-                    with open(self.note_dir + f'notes_set{i}.json', 'w') as file:
-                        json.dump(notes, file, indent=2)
+                    # Convert notes_exp to XML format
+                    notes_exp_xml = dict_to_xml('notes_expansion', notes_exp)
+                    
+                    # Write XML to files
+                    tree = ET.ElementTree(notes_exp_xml)
+                    ET.indent(tree)
 
-        with open(self.note_dir + f'full_notes_set.json', 'w') as file:
-            json.dump(full_notes_set, file, indent=2)
-
-        self.full_notes_set = full_notes_set
-        return full_notes_set
+                with open(self.note_dir + f'notes_set_exp{i}.xml', "wb") as f:
+                    tree.write(f, encoding="UTF-8", xml_declaration=True)
+                with open(self.note_dir + f'notes_set{i}.xml', 'wb') as f:
+                    tree.write(f, encoding="UTF-8", xml_declaration=True)
 
     def get_chapters_notes_list(self):
         return self.full_notes_set

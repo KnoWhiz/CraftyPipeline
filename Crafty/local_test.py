@@ -15,7 +15,7 @@ para = {
     "creative_temperature": 0.5,        # Temperature for creative model
 
     # Course information
-    "course_info": "Hartmut want to learn about the history of the United States!",
+    "course_info": "Bob want to learn about the history of the United States!",
     'llm_source': 'openai',
     'temperature': 0,
     "openai_key_dir": ".env",                               # OpenAI key directory
