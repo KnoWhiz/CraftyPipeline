@@ -5,7 +5,7 @@ from pipeline.dev_tasks import generate_videos
 
 para = {
     # Video generation parameters
-    "if_long_videos": False,             # If true, generate long videos
+    "if_long_videos": True,             # If true, generate long videos
     "if_short_videos": False,           # Currently do not have short videos
     "script_max_words": 100,            # Currently not used
     "slides_template_file": "3",        # Marking the template file under the folder "templates". User can put their own template file name.
