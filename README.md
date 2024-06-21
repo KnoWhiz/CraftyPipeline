@@ -44,126 +44,97 @@ cd "<project_dir>"
 echo "OPENAI_API_KEY=sk-xxx" > .env
 ```
 
-## Run Native
+## CLI Commands
 
-Edit parameters in local_test.py file:
+Crafty provides two main commands: `create` and `step`.
 
-```python
-para = {
-    # Video generation parameters
-    "if_long_videos": True,             # If true, generate long videos
-    "if_short_videos": False,           # Currently do not have short videos
-    "script_max_words": 100,            # Currently not used
-    "slides_template_file": "3",        # Marking the template file under the folder "templates". User can put their own template file name.
-    "slides_style": "simple",           # Only use it if template file is not provided
-    "content_slide_pages": 30,          # Number of pages for content slides
-    "if_parallel_processing": False,    # If true, use parallel processing (chapters) for video generation
-    "creative_temperature": 0.5,        # Temperature for creative model
+### Create
 
-    # Course information
-    "course_info": "I want to learn about the history of the United States!",
-    'llm_source': 'openai',
-    'temperature': 0,
-    "openai_key_dir": ".env",                               # OpenAI key directory
-    "results_dir": "pipeline/test_outputs/",                # Output directory
-    "sections_per_chapter": 20,                             # Number of sections per chapter
-    "max_note_expansion_words": 500,                        # Maximum number of words for note expansion
-    "regions": ["Overview", "Examples", "Essentiality"],    # Regions for note expansion
-    "if_advanced_model": False,                             # If true, use advanced model for note expansion (more expensive!)
-}
-```
-
-You can specify the learning objective in
-
-```python
-"course_info": "I want to learn about the history of the United States!",
-```
-
-Run locally:
+The `create` command is used to create a new course video from given topic. To use the `create` command, simply type:
 
 ```bash
-conda activate crafty
-cd "<project_dir>"
-python local_test.py
+python Crafty/cli.py create --topic "I would like to learn about ..."
 ```
 
-## Work flow
+The `create` command has several optional parameters that can be used to customize the behavior of the command. Here's a brief description of each:
 
-The project is started by running ```local_test.py```. Then ```generate_videos``` in ```dev_tasks.py``` will be called. With the steps in ```generate_videos```, we can create chapters (and sections under them) and then notes (for sections under each chapter). After getting the notes, we can take them as material to run ```VideoProcessor``` for videos generation.
+- `--temperature <float>`: This parameter sets the temperature for the basic and advanced model. The default value is 0.
 
-### local_test.py
-After running local_test.py, we call
-```python
-generate_videos(para)
-```
-imported from 
-```python
-pipeline.dev_tasks
-```
+- `--creative_temperature <float>`: This parameter sets the temperature for the creative model. The default value is 0.5.
 
-### dev_tasks.py
-Then we go through the work flow:
-1. **Generate chapters:**
-    - mynotes.create_chapters()
-2. **Generate sections (under chapters):**
-    - mynotes.create_sections()
-3. **Generate note for each section (regions defined in para):**
-    - mynotes.create_notes()
-4. **Videos generation for each chapter:**
-    - myfulllongvideos.run_parallel_processing() for processing each chapter in parallel using multiprocessing
-    - myfulllongvideos.run_sequential_processing() for processing each chapter sequentially
-```python
-mynotes = Zeroshot_notes(para)
-mynotes.create_chapters()
-mynotes.create_sections()
-mynotes.create_notes()
-print(f"Time to create notes: {round((time.time() - st) / 60, 0)} mins of the course for the request {para['course_info'] }.")
+- `--slides_template_file <str>`: This parameter specifies the template file to use for generating slides. The default value is '3'.
 
-para['course_id'] = mynotes.course_id
-# print(f"\nCourse ID: {para['course_id']}")
+- `--slides_style <str>`: This parameter specifies the style of the slides. It should only be used if a template file is not provided. The default value is 'simple'.
 
-if(para['if_long_videos']):
-    myfulllongvideos = VideoProcessor(para)
-    if(para['if_parallel_processing']):
-        myfulllongvideos.run_parallel_processing()
-    else:
-        myfulllongvideos.run_sequential_processing()
+- `--content_slide_pages <int>`: This parameter sets the number of pages to generate for content slides. The default value is 30.
+
+- `--parallel_processing`: This flag indicates whether to use parallel processing in the generation. It does not require a value. If used, it sets the value to True.
+
+- `--advanced_model`: This flag indicates whether to use the advanced model for note expansion. It does not require a value. If used, it sets the value to True.
+
+- `--sections_per_chapter <int>`: This parameter sets the number of sections per chapter. The default value is 20.
+
+- `--max_note_expansion_words <int>`: This parameter sets the maximum number of words for note expansion. The default value is 500.
+
+These parameters can be used as follows:
+
+```bash
+python Crafty/cli.py create --topic <topic> --temperature <float> --creative_temperature <float> --slides_template_file <str> --slides_style <str> --content_slide_pages <int> --parallel_processing --advanced_model --sections_per_chapter <int> --max_note_expansion_words <int>
 ```
 
-### zeroshot_notes.py
-```course_id``` defined by hashing ```self.course_info```. Output files will be saved in ```/pipeline/test_outputs/<material_type>/<course_id>/```.
+Replace `<topic>`, `<float>`, `<str>`, and `<int>` with the actual values you want to use. If you want to use the `--parallel_processing` or `--advanced_model` flags, simply include them in the command without a value.
 
-For notes generation, we properly format learning topic with
-```python
-_extract_zero_shot_topic(self)
-```
-in format:
-```python
-{
-"context": <what is the context of this course>,
-"level": <what is the level of this course>,
-"subject": <what is the subject of this course>,
-"zero_shot_topic": <what is the zero_shot_topic of this course>
-}
-```
-Then we go through the process of chapters generation
-```python
-create_chapters(self)
-```
-For the list of chapters, generate sections under each chapter in parallel
-```python
-create_sections(self)
-```
-The information about chapters and sections will be saved in ```chapters_and_sections.json``` under ```/pipeline/test_outputs/notes/<course_id>/```.
+### Step
 
-Next by going through each chapter, we generate notes for sections in parallel:
-```python
-notes_exp = robust_generate_expansions(llm, sections_list_temp, chapters_name_temp, self.course_name_textbook_chapters["Course name"], max_note_expansion_words, 3, self.regions)
-```
-All files saved as ```notes_set{i}.json``` under ```/pipeline/test_outputs/notes/<course_id>/```, with ```i``` is the chapter index.
+The `step` command is used to execute a specific step in the course creation process. The steps should be executed in the following order:
 
-Examples:
+1. `chapter`
+1. `section`
+1. `note`
+1. `slide`
+1. `script`
+1. `voice`
+1. `video`
+
+Here's how to use each step:
+
+#### Chapter
+
+You should always start with chapter command to create meta data and chapters for a given learning topic.
+
+```bash
+python Crafty/cli.py step chapter --topic <topic>
 ```
+
+After the first step, each step will prompt you the next step to execute in the console. Please follow the instructions to continue.
+
+#### Section
+
+Start from second step, you are going to provide the course_id instead of topic to continue using existing materials.
+
+```bash
+python Crafty/cli.py step section --course_id <course_id> --sections_per_chapter 20
+```
+
+`--sections_per_chapter` is the number of sections you want to create for each chapter. The default value is 20.
+
+#### Note
+
+To generate notes for the sections of a course, use the `note` step. Starting from notes step, you must use `--chapter` to specify which chapter you want to generate.
+
+```bash
+python Crafty/cli.py step note --course_id <course_id> --max_note_expansion_words 500 --chapter 0
+```
+
+`--max_note_expansion_words` is the maximum number of words to expand the notes. The default value is 500.
+
+`--chapter` is the chapter index to generate notes for. The chapter number start from 0.
+
+Here is an example of notes generation for a course with 3 chapters:
+
+You can revise the notes before proceeding to the next step.
+
+```xml
 <?xml version='1.0' encoding='UTF-8'?>
 <notes_expansion>
   <root>
@@ -219,49 +190,46 @@ Examples:
       <item>
         <Essentiality>These civilizations were essential in shaping the cultural and historical landscape of the Americas. They developed complex societies with advanced technologies and artistic achievements that continue to fascinate scholars and visitors alike. The Maya, Aztec, and Inca left a lasting legacy that is still celebrated and studied today.</Essentiality>
       </item>
+    </Major_PreColumbian_Civilizations_The_Maya_Aztec_and_Inca>
+  </root>
+</notes_expansion>
+
 ```
 
-### long_videos.py
-After getting all notes, we generate videos will the following steps
+#### Slide
 
-1. **Create the full slides for the chapter**
-2. **Generate images for the slides with only titles**
-    - Currently have a dummy logic generating images for sub-title slides only.
-3. **Generate scripts for each slide**
-4. **Insert images into TEX file of the slides and compile PDF**
-    - Based on MacTex (on Mac)
-5. **Generate audio files (.mp3) for the scripts**
-    - Could be improved with latest TTS progress in the future: https://bytedancespeech.github.io/seedtts_tech_report/#applications-samples
-6. **Convert the full slides PDF to images**
-7. **Convert the audio files to MP4 and combine them**
-    - Based on ffmpeg and moviepy.editor
-    - This is when your computer will start to suffer...
+To create slides for the notes of a course, use the `slide` step.
 
-```python
-def create_long_videos(self, chapter=0):
-    """
-    Create long videos for each chapter based on the notes set number.
-    """
-    # Create the full slides for the chapter
-    self.create_full_slides(notes_set_number = chapter)  #"notes_set1"
-    # Generate images for the slides with only titles
-    self.create_scripts(notes_set_number = chapter)  #"notes_set1"
-    # Generate scripts for each slide
-    self.tex_image_generation(notes_set_number = chapter)
-    # Insert images into TEX file of the slides and compile PDF
-    self.insert_images_into_latex(notes_set_number = chapter)
-    # Generate audio files for the scripts
-    self.scripts2voice(notes_set_number = chapter)
-    # Convert the full slides PDF to images
-    self.pdf2image(notes_set_number = chapter)
-    # Convert the audio files to MP4 and combine them
-    self.mp3_to_mp4_and_combine(notes_set_number = chapter)
+```bash
+python Crafty/cli.py step slide --course_id <course_id> --slides_template_file 3 --content_slide_pages 30 --chapter 0
 ```
 
-For PDF compiling:
-```python
-command = ['/Library/TeX/texbin/xelatex', tex_file_path]
-subprocess.run(command, cwd=working_directory)
+`--slides_template_file` is the template file to use for generating slides. The default value is 3.
+
+`--content_slide_pages` is the number of pages to generate for content slides. The default value is 30.
+
+#### Script
+
+To create scripts for the slides of a course, use the `script` step.
+
+```bash
+python Crafty/cli.py step script --course_id <course_id> --chapter 0
+```
+
+#### Voice
+
+To generate voice for reading the scripts of a course, use the `voice` step.
+
+```bash
+python Crafty/cli.py step voice --course_id <course_id> --chapter 0
+```
+
+#### Video
+
+Finally, to create videos from the voices and slides of a course, use the `video` step.
+
+```bash
+python Crafty/cli.py step video --course_id <course_id> --chapter 0
 ```
 
 ## Time consuming and cost

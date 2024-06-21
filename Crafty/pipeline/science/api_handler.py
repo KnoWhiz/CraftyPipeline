@@ -30,7 +30,7 @@ class OpenAiHandler(LLMApiHandler):
             # model = ChatOpenAI(temperature=temperature, streaming=True, callbacks=[StreamingStdOutCallbackHandler()], model_name=model_name)
             model = ChatOpenAI(temperature=temperature, streaming=False, callbacks=[BaseCallbackHandler()], model_name=model_name, verbose=False)
             # model = ChatOpenAI(temperature=temperature, streaming=False, callbacks=[ConsoleCallbackHandler()], model_name=model_name, verbose=False)
-            print(f'Successfully loaded {model_name}!')
+            # print(f'Successfully loaded {model_name}!')
             return model
         except Exception as e:
             print(f'Failed to load {model_name} due to {e}')
@@ -45,7 +45,7 @@ class LLMApiFactory:
         # print("\nLoading LLM API handler...")
         llm_source = para['llm_source'].lower()
         if llm_source == 'openai':
-            return OpenAiHandler(para['openai_key_dir'])
+            return OpenAiHandler(".env")
         # Extend here with elif statements for other LLM sources
         else:
             raise ValueError(f'LLM source {llm_source} is not supported.')
