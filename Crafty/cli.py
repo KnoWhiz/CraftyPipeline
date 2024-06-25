@@ -114,10 +114,11 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         if topic is not None:
             para['topic'] = topic
             topic_step = Topic(para)
-            click.echo(f'Start generating topic {topic}... Course ID: {topic_step.course_id}')
+            para['course_id'] = topic_step.course_id
+            click.echo(f'Start generating topic {topic}... Course ID: {para["course_id"]}')
             topic_step.execute()
             chapter_step = Chapters(para)
-            click.echo(f'Start generating chapters for Course ID: {chapter_step.course_id}')
+            click.echo(f'Start generating chapters for Course ID: {para["course_id"]}...')
             chapter_step.execute()
             click.echo('Chapters are generated, please review the file and run next step with:')
             click.secho(f'python Crafty/cli.py step section --course_id {para["course_id"]} --sections_per_chapter 20', fg='green')
