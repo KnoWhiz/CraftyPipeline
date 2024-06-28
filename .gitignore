@@ -183,9 +183,14 @@ cython_debug/
 
 # assets and configs of ChatTTS
 
-/asset
-/config
-
+Crafty/asset
+Crafty/config
+Crafty/__pycache__
+Crafty/ChatTTS/__pycache__
+Crafty/Crafty/pipline/__pycache__
+Crafty/Crafty/pipline/science/__pycache__
+Crafty/Crafty/pipline/utils/__pycache__
 # inferred result
 *.wav
 
+Crafty
