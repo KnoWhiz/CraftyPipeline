@@ -1,4 +1,6 @@
 
+Crafty/asset/
+Crafty/config/
 Crafty/.env
 .idea/
 .env
@@ -15,7 +17,7 @@ Crafty/Crafty/pipeline/science/.DS_Store
 /Crafty/pipeline/test_outputs
 Crafty/outputs/
 *.mp4
-__pycache__
+__pycache__/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -183,12 +185,11 @@ cython_debug/
 
 # assets and configs of ChatTTS
 
-Crafty/asset
-Crafty/config
+
 Crafty/__pycache__
 Crafty/ChatTTS/__pycache__
 Crafty/Crafty/pipline/__pycache__
 Crafty/Crafty/pipline/science/__pycache__
 Crafty/Crafty/pipline/utils/__pycache__
 # inferred result
-*.wav
+*.wavCrafty/asset
