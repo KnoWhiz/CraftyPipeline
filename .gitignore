@@ -1,0 +1,17 @@
+
+Crafty/.env
+.idea/
+.env
+*.pyc
+.DS_Store
+Crafty/Crafty/.DS_Store
+Crafty/Crafty/pipeline/.DS_Store
+Crafty/Crafty/pipeline/science/.DS_Store
+.DS_Store
+Crafty/.DS_Store
+Crafty/Crafty/pipeline/.DS_Store
+Crafty/Crafty/pipeline/science/.DS_Store
+.DS_Store
+/Crafty/pipeline/test_outputs
+Crafty/outputs/
+*.mp4
