@@ -14,6 +14,12 @@ from Crafty.pipeline.utils.xml import XmlUtil
 class Notes(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
+
+        self.if_short_video = para['if_short_video']
+        self.zero_shot_topic = para['topic']
+        self.chapters_list = [self.zero_shot_topic]
+
+        self.topic = para['topic']
         self.regions = ["Overview", "Examples", "Essentiality"]
         self.max_note_expansion_words = para['max_note_expansion_words']
         self.chapter = para['chapter']
@@ -23,28 +29,70 @@ class Notes(PipelineStep):
         else:
             self.llm = self.llm_basic
 
-        self.read_meta_data_from_file()
+        if(self.if_short_video != True):
+            self.read_meta_data_from_file()
 
     def execute(self):
-        if self.chapter is None or self.chapter < 0:
-            raise ValueError("Chapter number is not provided or invalid.")
+        if(self.if_short_video == True):
+            # Generate notes for short videos
+            notes_exp = self.short_generate_expansions(input_prompt=self.topic)
 
-        chapter_name = self.chapters_list[self.chapter]
-        sections = self.sections_list[self.chapter]
+            # Convert notes_exp to XML format
+            notes_exp_xml = XmlUtil.dict_to_xml('notes_expansion', notes_exp)
 
-        notes_exp = self.robust_generate_expansions(chapter_name, sections, 5)
+            # Write XML to files
+            tree = ET.ElementTree(notes_exp_xml)
+            ET.indent(tree)
 
-        # Convert notes_exp to XML format
-        notes_exp_xml = XmlUtil.dict_to_xml('notes_expansion', notes_exp)
+            note_path = self.notes_dir + 'notes_set0.xml'
+            with open(note_path, "wb") as f:
+                tree.write(f, encoding="UTF-8", xml_declaration=True)
+            click.echo(f'The notes file is saved to: {note_path}')
 
-        # Write XML to files
-        tree = ET.ElementTree(notes_exp_xml)
-        ET.indent(tree)
+        elif(self.if_short_video == False):
+            if self.chapter is None or self.chapter < 0:
+                raise ValueError("Chapter number is not provided or invalid.")
 
-        note_path = self.notes_dir + f'notes_set{self.chapter}.xml'
-        with open(note_path, "wb") as f:
-            tree.write(f, encoding="UTF-8", xml_declaration=True)
-        click.echo(f'The notes file for chapter {self.chapter} is saved to: {note_path}')
+            chapter_name = self.chapters_list[self.chapter]
+            sections = self.sections_list[self.chapter]
+
+            notes_exp = self.robust_generate_expansions(chapter_name, sections, 5)
+
+            # Convert notes_exp to XML format
+            notes_exp_xml = XmlUtil.dict_to_xml('notes_expansion', notes_exp)
+
+            # Write XML to files
+            tree = ET.ElementTree(notes_exp_xml)
+            ET.indent(tree)
+
+            note_path = self.notes_dir + f'notes_set{self.chapter}.xml'
+            with open(note_path, "wb") as f:
+                tree.write(f, encoding="UTF-8", xml_declaration=True)
+            click.echo(f'The notes file for chapter {self.chapter} is saved to: {note_path}')
+
+    def short_generate_expansions(self, input_prompt):
+        output_instructions = "Provide expansions for the given section in XML format."
+        inputs = {
+            "input_prompt": input_prompt,
+            "output_instructions": output_instructions,
+            "expansion_length": self.max_note_expansion_words,
+        }
+
+        parser = XMLOutputParser()
+        error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
+        prompt = ChatPromptTemplate.from_template(
+            """
+            Your task is to indentify a single key points in the given prompt: {input_prompt} and provide explanations for that point.
+            Format the output in XML format as follows:
+            ----------------
+            {output_instructions}
+            ----------------
+            Max words for expansion: {expansion_length}
+            """
+        )
+        chain = prompt | self.llm | error_parser
+        results = chain.invoke(inputs)
+        return dict(zip([input_prompt], [results]))
 
     def robust_generate_expansions(self, chapter_name, sections, max_attempts=5):
         """

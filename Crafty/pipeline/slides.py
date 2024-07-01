@@ -19,20 +19,34 @@ class Slides(PipelineStep):
 
     def __init__(self, para):
         super().__init__(para)
+
+        self.if_short_video = para['if_short_video']
+        self.zero_shot_topic = para['topic']
+        self.chapters_list = [self.zero_shot_topic]
+
         os.makedirs(self.videos_dir, exist_ok=True)
 
-        self.slides_template_file = para['slides_template_file']
-        self.slides_style = para['slides_style']
-        self.content_slide_pages = para['content_slide_pages']
-        self.chapter = para['chapter']
-        self.read_meta_data_from_file()
+        if(self.if_short_video == False):
+            self.slides_template_file = para['slides_template_file']
+            self.slides_style = para['slides_style']
+            self.content_slide_pages = para['content_slide_pages']
+            self.chapter = para['chapter']
+            self.read_meta_data_from_file()
+        elif(self.if_short_video == True):
+            self.slides_template_file = para['slides_template_file']
+            self.slides_style = para['slides_style']
+            self.content_slide_pages = 2
+            self.chapter = para['chapter']
 
     def execute(self):
         if self.chapter is None or self.chapter < 0:
             raise ValueError("Chapter number is not provided or invalid.")
 
         # Create the full slides for the chapter
-        full_slides = self.create_full_slides(notes_set_number=self.chapter)
+        if(self.if_short_video == True):
+            full_slides = self.create_full_slides_short(notes_set_number=self.chapter)
+        elif(self.if_short_video == False):
+            full_slides = self.create_full_slides(notes_set_number=self.chapter)
         click.echo(f'Slides generation finished, next step is generate images.')
         # # Generate images for the slides with only titles
         self.tex_image_generation(full_slides, notes_set_number=self.chapter)
@@ -41,6 +55,59 @@ class Slides(PipelineStep):
         self.insert_images_into_latex(notes_set_number=self.chapter)
         # Compile the slides to PDF
         self.compile_tex_file_to_pdf(notes_set_number=self.chapter)
+
+    def create_full_slides_short(self, notes_set_number=-1):
+        """
+        Generate short slides.
+        """
+        slides_template = self._load_slides_template()
+
+        notes_xml = self.notes_dir + f'notes_set{notes_set_number}.xml'
+        if os.path.exists(notes_xml):
+            with open(notes_xml, 'r') as xml_file:
+                notes_set = xml_file.read()
+        else:
+            raise FileNotFoundError(f"Notes set file not found: {notes_xml}")
+        
+        parser = StrOutputParser()
+        error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
+        prompt = ChatPromptTemplate.from_template(
+            """
+            As a short video YouTuber illustrating concept: ```{zero_shot_topic}```.
+            Based on the provided material: ```{notes_set}```.
+            Please follow the following steps and requirements to generate only {page_number} pages of slides.
+            Structure:
+            1. First page is the tile with the concept to illustrate
+            2. Second page is the explanation of this concept, just a few concise bullet points
+            Based on the template in latex format ```{tex_template}``` (But keep in mind that this is only a template, so do not need to include the information in it in your response unless it also shows in the provided material.)
+            Important: only response in pure correct latex format. Do not include "```" at the beginning and the end.
+            """)
+        chain = prompt | self.llm_basic | error_parser
+        full_slides = chain.invoke({'zero_shot_topic': self.zero_shot_topic,
+                                    'notes_set': notes_set,
+                                    'page_number': self.content_slide_pages,
+                                    'tex_template': slides_template})
+        prompt = ChatPromptTemplate.from_template(
+            """
+            For course ```{zero_shot_topic}``` and chapter ```{chapter}```.
+            Generate a description text for the slides for this lecture within 100 words.
+            Start with "This lecture ..." and make sure the generated content is closely tied to the content of the slide.
+            Lecture slides:
+            ```{full_slides}```
+            """)
+        chain = prompt | self.llm_basic | error_parser
+        video_description = chain.invoke({'zero_shot_topic': self.zero_shot_topic,
+                                          'chapter': self.chapters_list[notes_set_number],
+                                          'full_slides': full_slides})
+        with open(self.debug_dir + f"video_description_chapter_{notes_set_number}.json", 'w') as file:
+            json.dump(video_description, file, indent=2)
+
+        # Save the response in a .tex file instead of a .txt file
+        tex_path = self.videos_dir + f'full_slides_for_notes_set{notes_set_number}' + ".tex"
+        with open(tex_path, 'w') as file:
+            file.write(full_slides)
+        click.echo(f'Tex file for chapter {notes_set_number} saved to: {tex_path}')
+        return full_slides
 
     def create_full_slides(self, notes_set_number=-1):
         """
