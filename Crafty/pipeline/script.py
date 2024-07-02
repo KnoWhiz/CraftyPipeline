@@ -16,8 +16,13 @@ class Script(PipelineStep):
         super().__init__(para)
         self.llm = self.llm_advance
 
+        self.if_short_video = para['if_short_video']
+        self.zero_shot_topic = para['topic']
+        self.chapters_list = [self.zero_shot_topic]
+
         self.chapter = para['chapter']
-        self.read_meta_data_from_file()
+        if(self.if_short_video != True):
+            self.read_meta_data_from_file()
 
     def execute(self):
         if self.chapter is None or self.chapter < 0:
@@ -71,7 +76,7 @@ class Script(PipelineStep):
                 scripts_temp_1 = chain_1.invoke({'zero_shot_topic': self.zero_shot_topic,
                                                  'notes_set': notes_set,
                                                  'slide_text': slide_texts[i],
-                                                 'outline': slide_texts[i + 1],
+                                                 'outline': slide_texts[min(i + 1, len(slide_texts) - 1)],
                                                  'chapter': self.chapters_list[notes_set_number]})
 
 
@@ -88,7 +93,7 @@ class Script(PipelineStep):
                 scripts = chain_2.invoke({'zero_shot_topic': self.zero_shot_topic,
                                           'notes_set': notes_set,
                                           'slide_text': slide_texts[i],
-                                          'outline': slide_texts[i + 1],
+                                          'outline': slide_texts[min(i + 1, len(slide_texts) - 1)],
                                           'chapter': self.chapters_list[notes_set_number],
                                           'scripts_temp_1': scripts_temp_1})
 
@@ -175,7 +180,7 @@ class Script(PipelineStep):
                 scripts_temp_1 = chain_1.invoke({'zero_shot_topic': self.zero_shot_topic,
                                                  'notes_set': notes_set,
                                                  'slide_text': slide_texts[i],
-                                                 'outline': slide_texts[i + 1],
+                                                 'outline': slide_texts[min(i + 1, len(slide_texts) - 1)],
                                                  'chapter': self.chapters_list[notes_set_number]})
 
 
@@ -192,7 +197,7 @@ class Script(PipelineStep):
                 scripts = chain_2.invoke({'zero_shot_topic': self.zero_shot_topic,
                                           'notes_set': notes_set,
                                           'slide_text': slide_texts[i],
-                                          'outline': slide_texts[i + 1],
+                                          'outline': slide_texts[min(i + 1, len(slide_texts) - 1)],
                                           'chapter': self.chapters_list[notes_set_number],
                                           'scripts_temp_1': scripts_temp_1})
 
@@ -217,7 +222,7 @@ class Script(PipelineStep):
                     scripts_temp_1 = chain_1.invoke({'zero_shot_topic': self.zero_shot_topic,
                                                      'notes_set': notes_set,
                                                      'slide_text': slide_texts[i],
-                                                     'next_slide_text': slide_texts[i + 1],
+                                                     'next_slide_text': slide_texts[min(i + 1, len(slide_texts) - 1)],
                                                      'chapter': self.chapters_list[notes_set_number]})
 
 
@@ -234,7 +239,7 @@ class Script(PipelineStep):
                     scripts = chain_2.invoke({'zero_shot_topic': self.zero_shot_topic,
                                               'notes_set': notes_set,
                                               'slide_text': slide_texts[i],
-                                              'next_slide_text': slide_texts[i + 1],
+                                              'next_slide_text': slide_texts[min(i + 1, len(slide_texts) - 1)],
                                               'chapter': self.chapters_list[notes_set_number],
                                               'scripts_temp_1': scripts_temp_1})
 

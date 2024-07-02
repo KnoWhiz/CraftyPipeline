@@ -13,12 +13,20 @@ from Crafty.pipeline.pipeline_step import PipelineStep
 class Chapters(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
+
+        self.if_short_video = para['if_short_video']
+        self.zero_shot_topic = para['topic']
+        self.chapters_list = [self.zero_shot_topic]
+
         self.meta_dir = Config.OUTPUT_DIR + self.course_id + Config.COURSE_META_DIR
 
         # Chapters will use an advanced model.
         self.llm = self.llm_advance
 
     def execute(self):
+        if(self.if_short_video):
+            return
+
         if os.path.exists(self.meta_dir + Config.META_AND_CHAPTERS):
             with open(self.meta_dir + Config.META_AND_CHAPTERS, 'r') as file:
                 meta_data = json.load(file)

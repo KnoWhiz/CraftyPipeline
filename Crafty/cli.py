@@ -26,17 +26,22 @@ def cli():
 @click.option('--llm_source', type=str, help='The source of LLM.', required=False, default='openai')
 @click.option('--temperature', type=float, help='The temperature for the basic and advanced model.', required=False, default=0)
 @click.option('--creative_temperature', type=float, help='The temperature for the creative model.', required=False, default=0.5)
-@click.option('--slides_template_file', type=str, help='The template file for the slides.', required=False, default='3')
+@click.option('--slides_template_file', type=str, help='The template file for the slides.', required=False)
 @click.option('--slides_style', type=str, help='Only use it if template file is not provided.', required=False, default='simple')
-@click.option('--content_slide_pages', type=int, help='The number of pages for content slides.', required=False, default=30)
+@click.option('--content_slide_pages', type=int, help='The number of pages for content slides.', required=False)
 @click.option('--parallel_processing', is_flag=True, help='Use parallel processing in the generation.', required=False, default=False)
 @click.option('--advanced_model', is_flag=True, help='Use the advanced model for note expansion.', required=False, default=False)
 @click.option('--sections_per_chapter', type=int, help='The number of sections per chapter.', required=False, default=20)
 @click.option('--max_note_expansion_words', type=int, help='The maximum number of words for note expansion.', required=False, default=500)
-def create(topic, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, parallel_processing, advanced_model, sections_per_chapter, max_note_expansion_words):
+@click.option('--if_short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=True)
+def create(topic, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, parallel_processing, advanced_model, sections_per_chapter, max_note_expansion_words, if_short_video):
+    if content_slide_pages is None:
+        content_slide_pages = 2 if if_short_video else 30
     if sections_per_chapter < 5:
         click.echo('Error: sections_per_chapter should be greater or equal to 5.', err=True)
         return
+    if slides_template_file is None:
+        slides_template_file = '-3' if if_short_video else '3'
     para = {
         'topic': topic,
         'llm_source': llm_source,
@@ -48,6 +53,7 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
         'advanced_model': advanced_model,
         'sections_per_chapter': sections_per_chapter,
         'max_note_expansion_words': max_note_expansion_words,
+        'if_short_video': if_short_video,
     }
     topic_step = Topic(para)
     click.secho(f'Start generating topic {topic}... Course ID: {topic_step.course_id}', fg='green')
@@ -82,17 +88,22 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
 @click.option('--llm_source', type=str, help='The source of LLM.', required=False, default='openai')
 @click.option('--temperature', type=float, help='The temperature for the basic and advanced model.', required=False, default=0)
 @click.option('--creative_temperature', type=float, help='The temperature for the creative model.', required=False, default=0.5)
-@click.option('--slides_template_file', type=str, help='The template file for the slides.', required=False, default='3')
+@click.option('--slides_template_file', type=str, help='The template file for the slides.', required=False)
 @click.option('--slides_style', type=str, help='Only use it if template file is not provided.', required=False, default='simple')
-@click.option('--content_slide_pages', type=int, help='The number of pages for content slides.', required=False, default=30)
+@click.option('--content_slide_pages', type=int, help='The number of pages for content slides.', required=False)
 @click.option('--advanced_model', is_flag=True, help='Use the advanced model for note expansion.', required=False, default=False)
 @click.option('--sections_per_chapter', type=int, help='The number of sections per chapter.', required=False, default=20)
 @click.option('--max_note_expansion_words', type=int, help='The maximum number of words for note expansion.', required=False, default=500)
 @click.option('--chapter', type=int, help='Only generate output for one chapter.', required=False, default=-1)
-def step(step, topic, course_id, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, advanced_model, sections_per_chapter, max_note_expansion_words, chapter):
+@click.option('--if_short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=True)
+def step(step, topic, course_id, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, advanced_model, sections_per_chapter, max_note_expansion_words, chapter, if_short_video):
+    if content_slide_pages is None:
+        content_slide_pages = 2 if if_short_video else 30
     if sections_per_chapter < 5:
         click.echo('Error: sections_per_chapter should be greater or equal to 5.', err=True)
         return
+    if slides_template_file is None:
+        slides_template_file = '-3' if if_short_video else '3'
     para = {
         'llm_source': llm_source,
         'temperature': temperature,
@@ -104,6 +115,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         'sections_per_chapter': sections_per_chapter,
         'max_note_expansion_words': max_note_expansion_words,
         'chapter': chapter,
+        'if_short_video': if_short_video,
     }
     chapter_hint = '' if para['chapter'] == -1 else f' --chapter {para["chapter"]}'
 
