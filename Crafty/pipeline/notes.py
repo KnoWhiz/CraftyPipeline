@@ -1,4 +1,5 @@
 import asyncio
+from asyncio import Semaphore       # for rate limiting
 
 import xml.etree.ElementTree as ET
 
@@ -30,7 +31,11 @@ class Notes(PipelineStep):
             self.llm = self.llm_basic
 
         if(self.if_short_video != True):
+            self.semaphore = Semaphore(1)  
             self.read_meta_data_from_file()
+        else:
+            self.semaphore = Semaphore(2)       # limit to 2 concurrent executions
+
 
     def execute(self):
         if(self.if_short_video == True):
@@ -124,29 +129,30 @@ class Notes(PipelineStep):
         :param sections: A list of sections for which to generate notes.
         :return: A dictionary mapping section names to generated notes.
         """
-        inputs = [{
-            "course_name": self.zero_shot_topic,
-            "chapter_name": chapter_name,
-            "section": section,
-            "expansion_length": self.max_note_expansion_words,
-            "regions": self.regions,
-            "output_instructions": XmlUtil.generate_xml_elements(section, self.regions),
-        } for section in sections]
+        async with self.semaphore:    
+            inputs = [{
+                "course_name": self.zero_shot_topic,
+                "chapter_name": chapter_name,
+                "section": section,
+                "expansion_length": self.max_note_expansion_words,
+                "regions": self.regions,
+                "output_instructions": XmlUtil.generate_xml_elements(section, self.regions),
+            } for section in sections]
 
-        parser = XMLOutputParser()
-        error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
-        prompt = ChatPromptTemplate.from_template(
-            """
-            Course name: {course_name}
-            Chapter name: {chapter_name}
-            Your task is to provide expansions covering regions: {regions} for the given section: {section}
-            Format the output in XML format as follows:
-            ----------------
-            {output_instructions}
-            ----------------
-            Max words for expansion: {expansion_length}
-            """
-        )
+            parser = XMLOutputParser()
+            error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
+            prompt = ChatPromptTemplate.from_template(
+                """
+                Course name: {course_name}
+                Chapter name: {chapter_name}
+                Your task is to provide expansions covering regions: {regions} for the given section: {section}
+                Format the output in XML format as follows:
+                ----------------
+                {output_instructions}
+                ----------------
+                Max words for expansion: {expansion_length}
+                """
+            )
         chain = prompt | self.llm | error_parser
         results = await chain.abatch(inputs)
 

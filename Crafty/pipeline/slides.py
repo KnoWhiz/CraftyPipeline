@@ -14,6 +14,10 @@ from Crafty.pipeline.pipeline_step import PipelineStep
 from Crafty.pipeline.utils.network import NetworkUtil
 from Crafty.pipeline.utils.tex import TexUtil
 
+import asyncio
+# rate limiting pkg
+from openlimit import CompletionRateLimiter
+rate_limiter = CompletionRateLimiter(request_limit=5000, token_limit=1500000)
 
 class Slides(PipelineStep):
 
@@ -49,7 +53,7 @@ class Slides(PipelineStep):
             full_slides = self.create_full_slides(notes_set_number=self.chapter)
         click.echo(f'Slides generation finished, next step is generate images.')
         # # Generate images for the slides with only titles
-        self.tex_image_generation(full_slides, notes_set_number=self.chapter)
+        asyncio.run(self.tex_image_generation(full_slides, notes_set_number=self.chapter))
         click.echo(f'Images generation finished, next step is putting images into the Tex file.')
         # # Insert images into TEX file of the slides
         self.insert_images_into_latex(notes_set_number=self.chapter)
@@ -262,7 +266,7 @@ class Slides(PipelineStep):
             raise Exception(f"Error loading slides template: {e}")
         return slides_template
 
-    def tex_image_generation(self, full_slides, notes_set_number=-1):
+    async def tex_image_generation(self, full_slides, notes_set_number=-1):
         """
         Generate images for each title slide in the full slides LaTeX file.
         """
@@ -270,11 +274,11 @@ class Slides(PipelineStep):
         slide_texts = TexUtil.parse_latex_slides_raw(full_slides)
         for i in range(len(slide_texts)):
             if i >= 2 and slide_texts_temp[i] == '':
-                self.generate_dalle_image(prompt=slide_texts[i],
+                await self.generate_dalle_image(prompt=slide_texts[i],
                                           notes_set_number=notes_set_number,
                                           index=i)
 
-    def generate_dalle_image(self, prompt="Crafty", model="dall-e-3", size="1024x1024", quality="standard", notes_set_number=-1, index=0, retry_on_invalid_request=True):
+    async def generate_dalle_image(self, prompt="Crafty", model="dall-e-3", size="1024x1024", quality="standard", notes_set_number=-1, index=0, retry_on_invalid_request=True):
         """
         Generate an image using DALL-E based on a given prompt and save it to a local folder.
         The image is saved with a specific file name based on the notes set number and index.
@@ -293,13 +297,19 @@ class Slides(PipelineStep):
 
         client = openai.OpenAI()
         try:
-            response = client.images.generate(
-                model=model,
-                prompt=prompt,
-                size=size,
-                quality=quality,
-                n=1,
-            )
+            print("slides")
+            async with rate_limiter.limit(model=model,
+                    prompt=prompt,
+                    size=size,
+                    quality=quality,
+                    n=1,):
+                response = client.images.generate(
+                    model=model,
+                    prompt=prompt,
+                    size=size,
+                    quality=quality,
+                    n=1,
+                )
         except openai.BadRequestError as e:
             if retry_on_invalid_request:
                 print(f"OpenAI API request was invalid, retrying with default prompt: {e}")
