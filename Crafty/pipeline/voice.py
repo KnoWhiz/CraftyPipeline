@@ -1,12 +1,13 @@
 import json
 import os
-
 import click
 from openai import OpenAI
 from pydub import AudioSegment
-
 from Crafty.pipeline.pipeline_step import PipelineStep
-
+import asyncio
+# rate limiting pkg
+from openlimit import EmbeddingRateLimiter
+rate_limiter = EmbeddingRateLimiter(request_limit=150, token_limit=200000)
 
 class Voice(PipelineStep):
 
@@ -18,16 +19,17 @@ class Voice(PipelineStep):
         self.chapters_list = [self.zero_shot_topic]
 
         self.chapter = para['chapter']
-        if(self.if_short_video != True):
+        if self.if_short_video != True:
             self.read_meta_data_from_file()
 
     def execute(self):
         if self.chapter is None or self.chapter < 0:
             raise ValueError("Chapter number is not provided or invalid.")
 
-        self.scripts2voice(notes_set_number=self.chapter)
+        # Call the async function in a blocking manner
+        asyncio.run(self.scripts2voice(notes_set_number=self.chapter))
 
-    def scripts2voice(self, speech_file_path=None, input_text=None, model="tts-1", voice="alloy", notes_set_number=-1):
+    async def scripts2voice(self, speech_file_path=None, input_text=None, model="tts-1", voice="alloy", notes_set_number=-1):
         """
         Converts scripts into mp3 files. If the script files do not exist, it creates all necessary components.
         """
@@ -41,11 +43,10 @@ class Voice(PipelineStep):
             voice_file_path = speech_file_path if speech_file_path and (
                         speech_file_path.endswith("/") and os.path.exists(speech_file_path)) else self.videos_dir
             voice_file_path += f"voice_{i}_chapter_{notes_set_number}.mp3"
-            # print("\n\nCurrent script is: ", script)
-            self._voice_agent(speech_file_path=voice_file_path, input_text=str(script), model=model, voice=voice)
+            await self._voice_agent(speech_file_path=voice_file_path, input_text=str(script), model=model, voice=voice)
             click.echo(f"Voice {i} saved to: {voice_file_path}")
 
-    def _voice_agent(self, speech_file_path=None, input_text=None, model="tts-1", voice="alloy", notes_set_number=-1):
+    async def _voice_agent(self, speech_file_path=None, input_text=None, model="tts-1", voice="alloy", notes_set_number=-1):
         """
         Generates an audio speech file from the given text using the specified voice and model, with a 1-second silent time after the content.
 
@@ -61,26 +62,25 @@ class Voice(PipelineStep):
             speech_file_path = self.videos_dir + f"voice_{-1}_chapter_{notes_set_number}.mp3"
 
         try:
-            # Generate the speech audio
-            response = OpenAI().audio.speech.create(model=model, voice=voice, input=input_text)
+            async with rate_limiter.limit(model=model, voice=voice, input=input_text):
+                # Generate the speech audio
+                response = OpenAI().audio.speech.create(model=model, voice=voice, input=input_text)
+                # Save the generated speech to a temporary file
+                temp_audio_file = f"temp_speech_{notes_set_number}.mp3"
+                with open(temp_audio_file, "wb") as f:
+                    f.write(response.content)
 
-            # Save the generated speech to a temporary file
-            temp_audio_file = f"temp_speech_{notes_set_number}.mp3"
-            with open(temp_audio_file, "wb") as f:
-                f.write(response.content)
+                # Load the speech audio and create a 1-second silence
+                speech_audio = AudioSegment.from_file(temp_audio_file)
+                one_second_silence = AudioSegment.silent(duration=2000)  # 1,000 milliseconds
 
-            # Load the speech audio and create a 1-second silence
-            speech_audio = AudioSegment.from_file(temp_audio_file)
-            one_second_silence = AudioSegment.silent(duration=2000)  # 1,000 milliseconds
+                # Combine speech audio with silence
+                final_audio = speech_audio + one_second_silence
 
-            # Combine speech audio with silence
-            final_audio = speech_audio + one_second_silence
+                # Save the combined audio
+                final_audio.export(speech_file_path, format="mp3", parameters=["-ar", "16000"])
 
-            # Save the combined audio
-            final_audio.export(speech_file_path, format="mp3", parameters=["-ar", "16000"])
-
-            # Clean up the temporary file
-            os.remove(temp_audio_file)
+                # Clean up the temporary file
+                os.remove(temp_audio_file)
         except Exception as e:
             print(f"Failed to generate audio: {e}")
-

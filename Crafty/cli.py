@@ -1,7 +1,7 @@
 import click
 import os
 import sys
-
+import json
 # Add the grandparent directory to sys.path, so that Crafty as absolute import can be used.
 grandparent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, grandparent_dir)
@@ -15,6 +15,25 @@ from Crafty.pipeline.topic import Topic
 from Crafty.pipeline.video import Video
 from Crafty.pipeline.voice import Voice
 
+CONFIG_FILE = "config.json"
+
+def save_config(key, value):
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'r') as file:
+            config = json.load(file)
+    else:
+        config = {}
+    config[key] = value
+    
+    with open(CONFIG_FILE, 'w') as file:
+        json.dump(config, file)
+
+def load_config(key):
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'r') as file:
+            config = json.load(file)
+        return config.get(key)
+    return None
 
 @click.group()
 def cli():
@@ -97,6 +116,16 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
 @click.option('--chapter', type=int, help='Only generate output for one chapter.', required=False, default=-1)
 @click.option('--if_short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=True)
 def step(step, topic, course_id, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, advanced_model, sections_per_chapter, max_note_expansion_words, chapter, if_short_video):
+    
+    if topic is not None:
+        save_config('topic', topic)
+    else:
+        topic = load_config('topic')
+    
+    if topic is None:
+        click.echo('Error: Please provide a topic.')
+        return
+
     if content_slide_pages is None:
         content_slide_pages = 2 if if_short_video else 30
     if sections_per_chapter < 5:
@@ -105,6 +134,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
     if slides_template_file is None:
         slides_template_file = '-3' if if_short_video else '3'
     para = {
+        'topic' : topic,
         'llm_source': llm_source,
         'temperature': temperature,
         'creative_temperature': creative_temperature,

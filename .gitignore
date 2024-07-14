@@ -1,5 +1,6 @@
 
 Crafty/.env
+config.json
 .idea/
 .env
 *.pyc
