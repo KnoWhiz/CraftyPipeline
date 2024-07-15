@@ -36,6 +36,18 @@ export IMAGEIO_FFMPEG_EXE=$(which ffmpeg)
 os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/bin/ffmpeg"
 ```
 
+install openlimit
+
+The latest version of openlimit is not available on pypi, and the version on pypi doesn't compatible with Python 3.11+
+
+If you need to install the latest version. Execute the following commands anywhere in your workspace to install openlimit.
+
+```bash
+git clone https://github.com/shobrook/openlimit.git
+cd openlimit
+pip install .
+```
+
 ## Set OPENAI_API_KEY
 
 ```bash
