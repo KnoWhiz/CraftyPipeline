@@ -14,7 +14,6 @@ class Chapters(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
 
-        self.if_short_video = para['if_short_video']
         self.zero_shot_topic = para['topic']
         self.chapters_list = [self.zero_shot_topic]
 
@@ -24,9 +23,6 @@ class Chapters(PipelineStep):
         self.llm = self.llm_advance
 
     def execute(self):
-        if(self.if_short_video):
-            return
-
         if os.path.exists(self.meta_dir + Config.META_AND_CHAPTERS):
             with open(self.meta_dir + Config.META_AND_CHAPTERS, 'r') as file:
                 meta_data = json.load(file)

@@ -15,20 +15,14 @@ class Sections(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
 
-        self.if_short_video = para['if_short_video']
         self.zero_shot_topic = para['topic']
         self.chapters_list = [self.zero_shot_topic]
 
-        os.makedirs(self.notes_dir, exist_ok=True)
-        os.makedirs(self.debug_dir, exist_ok=True)
         self.sections_per_chapter = para['sections_per_chapter']
         # Sections will use an advanced model.
         self.llm = self.llm_advance
 
     def execute(self):
-        if(self.if_short_video):
-            return
-
         if os.path.exists(self.meta_dir + Config.META_AND_CHAPTERS):
             with open(self.meta_dir + Config.META_AND_CHAPTERS, 'r') as file:
                 meta_data = json.load(file)

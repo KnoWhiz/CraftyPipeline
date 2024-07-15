@@ -114,18 +114,12 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
 @click.option('--sections_per_chapter', type=int, help='The number of sections per chapter.', required=False, default=20)
 @click.option('--max_note_expansion_words', type=int, help='The maximum number of words for note expansion.', required=False, default=500)
 @click.option('--chapter', type=int, help='Only generate output for one chapter.', required=False, default=-1)
-@click.option('--if_short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=True)
+@click.option('--if_short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=False)
 def step(step, topic, course_id, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, advanced_model, sections_per_chapter, max_note_expansion_words, chapter, if_short_video):
-    
-    if topic is not None:
-        save_config('topic', topic)
+    if if_short_video:
+        click.echo("Running Crafty with the short video mode.")
     else:
-        topic = load_config('topic')
-    
-    if topic is None:
-        click.echo('Error: Please provide a topic.')
-        return
-
+        click.echo("Running Crafty with the long video mode.")
     if content_slide_pages is None:
         content_slide_pages = 2 if if_short_video else 30
     if sections_per_chapter < 5:
@@ -147,13 +141,17 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         'chapter': chapter,
         'if_short_video': if_short_video,
     }
-    chapter_hint = '' if para['chapter'] == -1 else f' --chapter {para["chapter"]}'
+    chapter_hint = f' --chapter {para["chapter"]}' if para['chapter'] != -1 else (' --chapter 0' if if_short_video else '')
+    short_video_hint = ' --if_short_video' if if_short_video else ''
 
     if course_id is not None:
         para['course_id'] = course_id
 
     if step == 'chapter':
-        if topic is not None:
+        if if_short_video:
+            click.echo('Error: Chapter step is not required for short video. Please start with note step with: ')
+            click.secho(f'python Crafty/cli.py step note --if_short_video --topic {topic} --max_note_expansion_words 500', fg='green')
+        elif topic is not None:
             para['topic'] = topic
             topic_step = Topic(para)
             para['course_id'] = topic_step.course_id
@@ -167,7 +165,9 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         else:
             click.echo('Error: Please provide a topic.')
     elif step == 'section':
-        if 'course_id' in para:
+        if if_short_video:
+            click.echo('Error: Section step is not required for short video. Please start with note step.')
+        elif 'course_id' in para:
             click.echo(f'Generating sections for chapters with course_id {para["course_id"]}...')
             section_step = Sections(para)
             section_step.execute()
@@ -176,7 +176,25 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         else:
             click.echo('Error: Please provide a course_id.')
     elif step == 'note':
-        if 'course_id' in para and 'chapter' in para:
+        if if_short_video:
+            if 'topic' in para:
+                para['topic'] = topic
+                topic_step = Topic(para)
+                para['course_id'] = topic_step.course_id
+                click.echo(f'Start generating topic {topic}... Course ID: {para["course_id"]}')
+                topic_step.execute()
+                click.echo(f'Generating notes for short video...')
+                if para['advanced_model']:
+                    para['llm'] = para['llm_advance']
+                notes_step = Notes(para)
+                notes_step.execute()
+                click.echo('Notes file are generated, please review the files and run next step with:')
+                click.secho(
+                    f'python Crafty/cli.py step slide --course_id {para["course_id"]} --slides_template_file 3 --content_slide_pages 30 --if_short_video' + chapter_hint,
+                    fg='green')
+            else:
+                click.echo('Error: Please provide required parameter topic for short video.')
+        elif 'course_id' in para and 'chapter' in para:
             click.echo(f'Generating notes for sections with course_id {para["course_id"]}...')
             if para['advanced_model']:
                 para['llm'] = para['llm_advance']
@@ -192,7 +210,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
             slides_step = Slides(para)
             slides_step.execute()
             click.echo('Slides files are generated, please review the files and run next step with:')
-            click.secho(f'python Crafty/cli.py step script --course_id {para["course_id"]}' + chapter_hint, fg='green')
+            click.secho(f'python Crafty/cli.py step script --course_id {para["course_id"]}' + chapter_hint + short_video_hint, fg='green')
         else:
             click.echo('Error: Please provide required parameter course_id, chapter.')
     elif step == 'script':
@@ -201,7 +219,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
             script_step = Script(para)
             script_step.execute()
             click.echo('Script files are generated, please review the files and run next step with:')
-            click.secho(f'python Crafty/cli.py step voice --course_id {para["course_id"]}' + chapter_hint, fg='green')
+            click.secho(f'python Crafty/cli.py step voice --course_id {para["course_id"]}' + chapter_hint + short_video_hint, fg='green')
         else:
             click.echo('Error: Please provide required parameter course_id, chapter.')
     elif step == 'voice':
@@ -210,7 +228,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
             voice_step = Voice(para)
             voice_step.execute()
             click.echo('Voice files are generated, please review the files and run next step with:')
-            click.secho(f'python Crafty/cli.py step video --course_id {para["course_id"]}' + chapter_hint, fg='green')
+            click.secho(f'python Crafty/cli.py step video --course_id {para["course_id"]}' + chapter_hint + short_video_hint, fg='green')
         else:
             click.echo('Error: Please provide required parameter course_id, chapter.')
     elif step == 'video':
