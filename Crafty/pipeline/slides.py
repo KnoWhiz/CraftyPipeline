@@ -24,39 +24,44 @@ class Slides(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
 
-        self.if_short_video = para['if_short_video']
+        self.short_video = para['short_video']
         self.zero_shot_topic = para['topic']
         self.chapters_list = [self.zero_shot_topic]
 
         os.makedirs(self.videos_dir, exist_ok=True)
 
-        if(self.if_short_video == False):
-            self.slides_template_file = para['slides_template_file']
-            self.slides_style = para['slides_style']
+        self.slides_template_file = para['slides_template_file']
+        self.slides_style = para['slides_style']
+        if(self.short_video == True):
+            self.content_slide_pages = 2
+            # self.chapter = 0
+            self.chapter = para['chapter']
+        else:
             self.content_slide_pages = para['content_slide_pages']
             self.chapter = para['chapter']
             self.read_meta_data_from_file()
-        elif(self.if_short_video == True):
-            self.slides_template_file = para['slides_template_file']
-            self.slides_style = para['slides_style']
-            self.content_slide_pages = 2
-            self.chapter = para['chapter']
 
     def execute(self):
         if self.chapter is None or self.chapter < 0:
             raise ValueError("Chapter number is not provided or invalid.")
 
         # Create the full slides for the chapter
-        if(self.if_short_video == True):
+        if(self.short_video == True):
             full_slides = self.create_full_slides_short(notes_set_number=self.chapter)
-        elif(self.if_short_video == False):
+            click.echo(f'Slides generation finished, next step is generate images.')
+            # # Generate images for the slides with only titles
+            asyncio.run(self.tex_image_generation(full_slides, notes_set_number=self.chapter))
+            click.echo(f'Images generation finished, next step is putting images into the Tex file.')
+            # # Insert images into TEX file of the slides
+            self.insert_images_into_latex(notes_set_number=self.chapter)
+        else:
             full_slides = self.create_full_slides(notes_set_number=self.chapter)
-        click.echo(f'Slides generation finished, next step is generate images.')
-        # # Generate images for the slides with only titles
-        asyncio.run(self.tex_image_generation(full_slides, notes_set_number=self.chapter))
-        click.echo(f'Images generation finished, next step is putting images into the Tex file.')
-        # # Insert images into TEX file of the slides
-        self.insert_images_into_latex(notes_set_number=self.chapter)
+            click.echo(f'Slides generation finished, next step is generate images.')
+            # # Generate images for the slides with only titles
+            asyncio.run(self.tex_image_generation(full_slides, notes_set_number=self.chapter))
+            click.echo(f'Images generation finished, next step is putting images into the Tex file.')
+            # # Insert images into TEX file of the slides
+            self.insert_images_into_latex(notes_set_number=self.chapter)
         # Compile the slides to PDF
         self.compile_tex_file_to_pdf(notes_set_number=self.chapter)
 

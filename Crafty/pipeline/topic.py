@@ -21,7 +21,7 @@ class Topic(PipelineStep):
         self.course_info = para['topic']
         # Topic will use a basic model.
         self.llm = self.llm_basic
-        self.if_short_video = para['if_short_video']
+        self.short_video = para['short_video']
 
     def execute(self):
         parser = JsonOutputParser()
@@ -54,7 +54,7 @@ class Topic(PipelineStep):
         )
         chain = prompt | self.llm | error_parser
         response = chain.invoke({'course_info': self.course_info})
-        response['short_video'] = self.if_short_video
+        response['short_video'] = self.short_video
         with open(self.meta_dir + Config.META_AND_CHAPTERS, 'w') as file:
             json.dump(response, file, indent=2)
         click.echo(f'The meta data is saved in {self.meta_dir + Config.META_AND_CHAPTERS}')

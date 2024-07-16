@@ -16,7 +16,7 @@ class Notes(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
 
-        self.if_short_video = para['if_short_video']
+        self.short_video = para['short_video']
         self.zero_shot_topic = para['topic']
         self.chapters_list = [self.zero_shot_topic]
 
@@ -30,15 +30,15 @@ class Notes(PipelineStep):
         else:
             self.llm = self.llm_basic
 
-        if(self.if_short_video != True):
+        if(self.short_video == True):
+            self.semaphore = Semaphore(2)       # limit to 2 concurrent executions
+        else:
             self.semaphore = Semaphore(1)  
             self.read_meta_data_from_file()
-        else:
-            self.semaphore = Semaphore(2)       # limit to 2 concurrent executions
 
 
     def execute(self):
-        if(self.if_short_video == True):
+        if(self.short_video == True):
             # Generate notes for short videos
             notes_exp = self.short_generate_expansions(input_prompt=self.topic)
 
@@ -54,7 +54,7 @@ class Notes(PipelineStep):
                 tree.write(f, encoding="UTF-8", xml_declaration=True)
             click.echo(f'The notes file is saved to: {note_path}')
 
-        elif(self.if_short_video == False):
+        else:
             if self.chapter is None or self.chapter < 0:
                 raise ValueError("Chapter number is not provided or invalid.")
 
