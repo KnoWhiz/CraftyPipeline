@@ -15,8 +15,9 @@ class Sections(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
 
+        self.short_video = para['short_video']
         self.zero_shot_topic = para['topic']
-        self.chapters_list = [self.zero_shot_topic]
+        # self.chapters_list = [self.zero_shot_topic]
 
         self.sections_per_chapter = para['sections_per_chapter']
         # Sections will use an advanced model.
@@ -35,26 +36,45 @@ class Sections(PipelineStep):
 
         parser = JsonOutputParser()
         error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
-        prompt = ChatPromptTemplate.from_template(
-            """
-            Based on {raw_sections_in_chapters}, the sections in a list of lists. The length of the list should be the same as the number of chapters.
-            Make sure every section is unique: If one section has a similar meaning with another section in another chapter,
-            only keep the first one (with lower chapter index) and remove the other sections.
-            Section name should not start with number.
-            Chapter list: ```{chapters_list}```.
-            Use the following json format:
-            ----------------
-            {{
-            "sections": [
-                [<section_1>, <section_2>, ..., <section_n>],
-                [<section_1>, <section_2>, ..., <section_m>],
-                ...
-                [<section_1>, <section_2>, ..., <section_p>],
-            ]
-            }}
-            ----------------
-            """
-        )
+        if(self.short_video == True):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                Based on {raw_sections_in_chapters}, the sections in a list of lists. The length of the list should be the same as the number of chapters.
+                Chapter list: ```{chapters_list}```.
+                Use the following json format:
+                ----------------
+                {{
+                "sections": [
+                    [<section_1>, <section_2>, ..., <section_n>],
+                    [<section_1>, <section_2>, ..., <section_m>],
+                    ...
+                    [<section_1>, <section_2>, ..., <section_p>],
+                ]
+                }}
+                ----------------
+                """
+            )
+        else:
+            prompt = ChatPromptTemplate.from_template(
+                """
+                Based on {raw_sections_in_chapters}, the sections in a list of lists. The length of the list should be the same as the number of chapters.
+                Make sure every section is unique: If one section has a similar meaning with another section in another chapter,
+                only keep the first one (with lower chapter index) and remove the other sections.
+                Section name should not start with number.
+                Chapter list: ```{chapters_list}```.
+                Use the following json format:
+                ----------------
+                {{
+                "sections": [
+                    [<section_1>, <section_2>, ..., <section_n>],
+                    [<section_1>, <section_2>, ..., <section_m>],
+                    ...
+                    [<section_1>, <section_2>, ..., <section_p>],
+                ]
+                }}
+                ----------------
+                """
+            )
         chain = prompt | self.llm | error_parser
         response = chain.invoke({'chapters_list': self.chapters_list, 'raw_sections_in_chapters': raw_sections_in_chapters})
         sections_list = response["sections"]

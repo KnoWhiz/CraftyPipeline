@@ -16,19 +16,101 @@ class Script(PipelineStep):
         super().__init__(para)
         self.llm = self.llm_advance
 
-        self.if_short_video = para['if_short_video']
+        self.short_video = para['short_video']
         self.zero_shot_topic = para['topic']
         self.chapters_list = [self.zero_shot_topic]
 
-        self.chapter = para['chapter']
-        if(self.if_short_video != True):
+        if(self.short_video == True):
+            # self.chapter = 0
+            self.chapter = para['chapter']
+        else:
+            self.chapter = para['chapter']
             self.read_meta_data_from_file()
 
     def execute(self):
         if self.chapter is None or self.chapter < 0:
             raise ValueError("Chapter number is not provided or invalid.")
 
-        self.create_scripts(self.chapter)
+        if(self.short_video == True):
+            self.create_scripts_short(self.chapter)
+        else:
+            self.create_scripts(self.chapter)
+
+    def create_scripts_short(self, notes_set_number=-1):
+        """
+        Generate scripts for short videos.
+        """
+        directory = self.notes_dir + f'notes_set{notes_set_number}.xml'
+        if os.path.exists(directory):
+            with open(directory, 'r') as xml_file:
+                notes_set = xml_file.read()
+
+        # Load in the simple full slides if they exist
+        if os.path.exists(self.videos_dir + f'full_slides_for_notes_set{notes_set_number}' + ".tex"):
+            with open(self.videos_dir + f'full_slides_for_notes_set{notes_set_number}' + ".tex", 'r') as file:
+                full_slides = file.read()
+        else:
+            raise FileNotFoundError(f"Full slides file not found in {self.videos_dir}")
+
+        slide_texts_temp = TexUtil.parse_latex_slides(full_slides)
+        click.echo(f"The content of the slides are: {slide_texts_temp}")
+        slide_texts = TexUtil.parse_latex_slides_raw(full_slides)
+        click.echo(f"Number of slides pages are: {len(slide_texts)}")
+
+        chapter_scripts = []
+        slides = []
+
+        print("len(slide_texts): ", len(slide_texts))
+
+        for i in range(len(slide_texts)):
+            if (i == 0):
+                parser = StrOutputParser()
+                error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
+                prompt = ChatPromptTemplate.from_template(
+                    """
+                    As a professor teaching course {zero_shot_topic}.
+                    Please generate a brief script for the first slide page: ```{slide_text}```.
+
+                    Requirements:
+                    1. Reply a fluent sentence with no more than 20 words.
+                    2. Try to be brief and concise.
+                    3. The response only has the information related to the slide.
+                    4. No more pleasantries
+                    """)
+                chain = prompt | self.llm | error_parser
+                scripts = chain.invoke({'zero_shot_topic': self.zero_shot_topic,
+                                        'notes_set': notes_set,
+                                        'slide_text': slide_texts[i],
+                                        'chapter': self.chapters_list[notes_set_number]})
+
+            else:
+                parser = StrOutputParser()
+                error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
+                prompt = ChatPromptTemplate.from_template(
+                    """
+                    As a professor teaching course {zero_shot_topic}.
+                    Please generate a brief script for a content slide page: ```{slide_text}```.
+                    
+                    Requirements:
+                    1. Reply a fluent sentence with no more than 20 words.
+                    2. Try to be brief and concise.
+                    3. The response only has the information related to the slide.
+                    4. No more pleasantries
+                    """)
+                chain = prompt | self.llm | error_parser
+                scripts = chain.invoke({'zero_shot_topic': self.zero_shot_topic,
+                                        'notes_set': notes_set,
+                                        'slide_text': slide_texts[i],
+                                        'chapter': self.chapters_list[notes_set_number]})
+                
+            chapter_scripts.append(scripts)
+            slides.append(slide_texts[i])
+            click.echo(f"Scripts generated for slide {i}")
+
+        file_path = self.videos_dir + f'scripts_for_notes_set{notes_set_number}' + ".json"
+        with open(file_path, 'w') as file:
+            json.dump(chapter_scripts, file, indent=2)
+        click.echo(f"Scripts for note set {notes_set_number} are saved to: {file_path}")
 
     def create_scripts(self, notes_set_number=-1):
         """

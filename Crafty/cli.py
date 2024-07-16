@@ -52,15 +52,15 @@ def cli():
 @click.option('--advanced_model', is_flag=True, help='Use the advanced model for note expansion.', required=False, default=False)
 @click.option('--sections_per_chapter', type=int, help='The number of sections per chapter.', required=False, default=20)
 @click.option('--max_note_expansion_words', type=int, help='The maximum number of words for note expansion.', required=False, default=500)
-@click.option('--if_short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=True)
-def create(topic, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, parallel_processing, advanced_model, sections_per_chapter, max_note_expansion_words, if_short_video):
+@click.option('--short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=False)
+def create(topic, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, parallel_processing, advanced_model, sections_per_chapter, max_note_expansion_words, short_video):
     if content_slide_pages is None:
-        content_slide_pages = 2 if if_short_video else 30
+        content_slide_pages = 2 if short_video else 30
     if sections_per_chapter < 5:
         click.echo('Error: sections_per_chapter should be greater or equal to 5.', err=True)
         return
     if slides_template_file is None:
-        slides_template_file = '-3' if if_short_video else '3'
+        slides_template_file = '-3' if short_video else '3'
     para = {
         'topic': topic,
         'llm_source': llm_source,
@@ -72,7 +72,7 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
         'advanced_model': advanced_model,
         'sections_per_chapter': sections_per_chapter,
         'max_note_expansion_words': max_note_expansion_words,
-        'if_short_video': if_short_video,
+        'short_video': short_video,
     }
     topic_step = Topic(para)
     click.secho(f'Start generating topic {topic}... Course ID: {topic_step.course_id}', fg='green')
@@ -84,7 +84,13 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
     section = Sections(para)
     section.execute()
     click.secho(f'Start generating chapters, slides, scripts, voices, videos by chapter...', fg='green')
-    for i in range(len(section.chapters_list)):
+    
+    if(short_video == True):
+        chapters_num = 1
+    else:
+        chapters_num = len(section.chapters_list)
+        
+    for i in range(chapters_num):
         # TODO need to implement parallel processing
         para['chapter'] = i
         click.secho(f'Start generating notes for chapter {i}...', fg='green')
@@ -114,19 +120,19 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
 @click.option('--sections_per_chapter', type=int, help='The number of sections per chapter.', required=False, default=20)
 @click.option('--max_note_expansion_words', type=int, help='The maximum number of words for note expansion.', required=False, default=500)
 @click.option('--chapter', type=int, help='Only generate output for one chapter.', required=False, default=-1)
-@click.option('--if_short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=False)
-def step(step, topic, course_id, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, advanced_model, sections_per_chapter, max_note_expansion_words, chapter, if_short_video):
-    if if_short_video:
+@click.option('--short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=False)
+def step(step, topic, course_id, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, advanced_model, sections_per_chapter, max_note_expansion_words, chapter, short_video):
+    if short_video:
         click.echo("Running Crafty with the short video mode.")
     else:
         click.echo("Running Crafty with the long video mode.")
     if content_slide_pages is None:
-        content_slide_pages = 2 if if_short_video else 30
+        content_slide_pages = 2 if short_video else 30
     if sections_per_chapter < 5:
         click.echo('Error: sections_per_chapter should be greater or equal to 5.', err=True)
         return
     if slides_template_file is None:
-        slides_template_file = '-3' if if_short_video else '3'
+        slides_template_file = '-3' if short_video else '3'
     para = {
         'topic' : topic,
         'llm_source': llm_source,
@@ -139,18 +145,18 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         'sections_per_chapter': sections_per_chapter,
         'max_note_expansion_words': max_note_expansion_words,
         'chapter': chapter,
-        'if_short_video': if_short_video,
+        'short_video': short_video,
     }
-    chapter_hint = f' --chapter {para["chapter"]}' if para['chapter'] != -1 else (' --chapter 0' if if_short_video else '')
-    short_video_hint = ' --if_short_video' if if_short_video else ''
+    chapter_hint = f' --chapter {para["chapter"]}' if para['chapter'] != -1 else (' --chapter 0' if short_video else '')
+    short_video_hint = ' --short_video' if short_video else ''
 
     if course_id is not None:
         para['course_id'] = course_id
 
     if step == 'chapter':
-        if if_short_video:
+        if short_video:
             click.echo('Error: Chapter step is not required for short video. Please start with note step with: ')
-            click.secho(f'python Crafty/cli.py step note --if_short_video --topic {topic} --max_note_expansion_words 500', fg='green')
+            click.secho(f'python Crafty/cli.py step note --short_video --topic {topic} --max_note_expansion_words 500', fg='green')
         elif topic is not None:
             para['topic'] = topic
             topic_step = Topic(para)
@@ -165,7 +171,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         else:
             click.echo('Error: Please provide a topic.')
     elif step == 'section':
-        if if_short_video:
+        if short_video:
             click.echo('Error: Section step is not required for short video. Please start with note step.')
         elif 'course_id' in para:
             click.echo(f'Generating sections for chapters with course_id {para["course_id"]}...')
@@ -176,7 +182,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         else:
             click.echo('Error: Please provide a course_id.')
     elif step == 'note':
-        if if_short_video:
+        if short_video:
             if 'topic' in para:
                 para['topic'] = topic
                 topic_step = Topic(para)
@@ -190,7 +196,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
                 notes_step.execute()
                 click.echo('Notes file are generated, please review the files and run next step with:')
                 click.secho(
-                    f'python Crafty/cli.py step slide --course_id {para["course_id"]} --slides_template_file 3 --content_slide_pages 30 --if_short_video' + chapter_hint,
+                    f'python Crafty/cli.py step slide --course_id {para["course_id"]} --slides_template_file 3 --content_slide_pages 30 --short_video' + chapter_hint,
                     fg='green')
             else:
                 click.echo('Error: Please provide required parameter topic for short video.')

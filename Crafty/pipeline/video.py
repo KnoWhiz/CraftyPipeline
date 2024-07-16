@@ -17,12 +17,15 @@ class Video(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
         os.makedirs(self.final_dir, exist_ok=True)
-        self.if_short_video = para['if_short_video']
+        self.short_video = para['short_video']
         self.zero_shot_topic = para['topic']
         self.chapters_list = [self.zero_shot_topic]
 
-        self.chapter = para['chapter']
-        if(self.if_short_video != True):
+        if(self.short_video == True):
+            # self.chapter = 0
+            self.chapter = para['chapter']
+        else:
+            self.chapter = para['chapter']
             self.read_meta_data_from_file()
 
     def execute(self):

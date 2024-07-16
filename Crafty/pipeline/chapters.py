@@ -14,8 +14,9 @@ class Chapters(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
 
+        self.short_video = para['short_video']
         self.zero_shot_topic = para['topic']
-        self.chapters_list = [self.zero_shot_topic]
+        # self.chapters_list = [self.zero_shot_topic]
 
         self.meta_dir = Config.OUTPUT_DIR + self.course_id + Config.COURSE_META_DIR
 
@@ -32,40 +33,72 @@ class Chapters(PipelineStep):
 
         parser = JsonOutputParser()
         error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
-        prompt = ChatPromptTemplate.from_template(
-            """
-            Requirements: \n\n\n
-            As as a professor teaching course: {zero_shot_topic}.
-            Please work through the following steps:
-            1. Find 3 most popular textbooks about this course topic, note down it as ```textbook and author```.
-            2. Based on these textbooks, come up with at most 10 and at least 5 learning sessions that the students can learn the entire course step by step.
-            3. In chapter name, mark the chapter numbers.
-            The output format should be json as follows:
-            ```json
-            {{
-            "course_name": <course name here>,
+        if(self.short_video == True):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                Requirements: \n\n\n
+                As as a professor teaching course: {zero_shot_topic}.
+                Please work through the following steps:
+                1. Find one most popular textbooks about this course topic, note down it as ```textbook and author```.
+                2. Based on these textbooks, come up with at most 5 learning sessions that the students can learn the entire course step by step.
+                3. In chapter name, mark the chapter numbers.
+                The output format should be json as follows:
+                ```json
+                {{
+                "course_name": <course name here>,
 
-            "textbooks": [
-                <textbook_1 here>,
-                <textbook_2 here>,
-                <textbook_3 here>,
-            ]
+                "textbooks": [
+                    <textbook here>,
+                ]
 
-            "authors": [
-                <author_1 here>,
-                <author_2 here>,
-                <author_3 here>,
-            ]
+                "authors": [
+                    <author here>,
+                ]
 
-            "Chapters": [
-                <chapter_1>,
-                <chapter_2>,
-                ...
-                <chapter_n>,
-            ]
-            }}
-            ```
-            """)
+                "Chapters": [
+                    <chapter_1>,
+                    <chapter_2>,
+                    ...
+                    <chapter_n>,
+                ]
+                }}
+                ```
+                """)
+        else:
+            prompt = ChatPromptTemplate.from_template(
+                """
+                Requirements: \n\n\n
+                As as a professor teaching course: {zero_shot_topic}.
+                Please work through the following steps:
+                1. Find 3 most popular textbooks about this course topic, note down it as ```textbook and author```.
+                2. Based on these textbooks, come up with at most 10 and at least 5 learning sessions that the students can learn the entire course step by step.
+                3. In chapter name, mark the chapter numbers.
+                The output format should be json as follows:
+                ```json
+                {{
+                "course_name": <course name here>,
+
+                "textbooks": [
+                    <textbook_1 here>,
+                    <textbook_2 here>,
+                    <textbook_3 here>,
+                ]
+
+                "authors": [
+                    <author_1 here>,
+                    <author_2 here>,
+                    <author_3 here>,
+                ]
+
+                "Chapters": [
+                    <chapter_1>,
+                    <chapter_2>,
+                    ...
+                    <chapter_n>,
+                ]
+                }}
+                ```
+                """)
         chain = prompt | self.llm | error_parser
         response = chain.invoke({'zero_shot_topic': zero_shot_topic})
         meta_data.update(response)
