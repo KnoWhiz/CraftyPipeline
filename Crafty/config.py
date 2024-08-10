@@ -1,4 +1,5 @@
 class Config:
+    INPUT_DIR = "inputs/"
     OUTPUT_DIR = "outputs/"
     COURSE_META_DIR = "/course_meta/"
     NOTES_DIR = "/notes/"

@@ -16,3 +16,11 @@ Crafty/pipeline/science/.DS_Store
 /Crafty/pipeline/test_outputs
 outputs/
 *.mp4
+*.jpg
+*.apkg
+*.pdf
+*.anki2
+*.json
+*.html
+Crafty/pipeline/.DS_Store
+Crafty/.DS_Store

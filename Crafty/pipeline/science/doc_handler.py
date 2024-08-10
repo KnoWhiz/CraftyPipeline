@@ -15,7 +15,6 @@ from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 
 from pipeline.science.api_handler import ApiHandler
 from pipeline.science.prompt_handler import PromptHandler
-from pipeline.science.anki_handler import AnkiLoader
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -114,12 +113,11 @@ class DocHandler:
         self.main_file_types = [split_filename(file) for file in self.main_filenames]
         self.supplementary_file_types = [split_filename(file) for file in self.supplementary_filenames]
 
-    def _loader_map(self, pdf_loader=PyMuPDFLoader, docx_loader=Docx2txtLoader, apkg_loader=AnkiLoader):
+    def _loader_map(self, pdf_loader=PyMuPDFLoader, docx_loader=Docx2txtLoader):
         """Initializes the mapping of file types to their respective loaders."""
         self.loader_map = {
             'pdf': pdf_loader,
             'docx': docx_loader,
-            'apkg': apkg_loader,
         }
 
     def _load_files(self):
@@ -169,10 +167,6 @@ class DocHandler:
         Returns:
         - float: The percentage of blank pages within the document.
         """
-        # Skip quality check if the file is an Anki note deck. We should only accept Anki note decks as main files (not mixed).
-        if(type == 'apkg'):
-            return 0.0
-        
         if not doc or not hasattr(doc, "__iter__") or not len(doc):
             return 0.0
 
@@ -485,15 +479,10 @@ class DocHandler:
         - str: The inferred course name and domain.
         """
         course_meta_file_path = os.path.join(self.course_meta_dir, "course_name_domain.txt")
-
-        if (self.main_file_types[0] != 'apkg'):
-            chunk = self.prompt.split_prompt(str(doc[:pages]), model_version, return_first_chunk_only=True)[0]
-            self.textbook_content_pages = chunk
-            # self.textbook_content_pages = self.cont_page_docs[0]['contents_docs']
-        else:
-            chunk = str([page.anki_content["Question"] for page in doc])
-            self.textbook_content_pages = chunk
-            print("chunk: ", chunk)
+        chunk = self.prompt.split_prompt(str(doc[:pages]), model_version, return_first_chunk_only=True)[0]
+        self.textbook_content_pages = chunk
+        # self.textbook_content_pages = self.cont_page_docs[0]['contents_docs']
+        
         # Check if the course meta file exists and read from it if it does
         if os.path.exists(course_meta_file_path):
             with open(course_meta_file_path, 'r') as file:

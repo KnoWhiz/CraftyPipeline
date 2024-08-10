@@ -23,7 +23,6 @@ from typing import List, Dict, Any, Optional
 from pipeline.science.api_handler import ApiHandler
 from pipeline.science.doc_handler import DocHandler
 from pipeline.science.prompt_handler import PromptHandler
-from pipeline.science.json_handler import JsonHandler
 
 class notes:
     def __init__(self, para_lectures):
