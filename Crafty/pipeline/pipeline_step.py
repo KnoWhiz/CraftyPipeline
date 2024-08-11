@@ -45,6 +45,7 @@ class PipelineStep(ABC):
             para['main_filenames'] = [self.file_name]
             para['supplementary_filenames'] = []
             self.docs = DocHandler(para)
+            self.main_embedding = self.docs.main_embedding[0]
 
     @abstractmethod
     def execute(self):
