@@ -11,7 +11,7 @@ from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain.output_parsers import OutputFixingParser
 
 from pipeline.science.api_handler import ApiHandler
-from pipeline.science.doc_handler import DocHandler
+from Crafty.pipeline.science.doc_handler import DocHandler
 from pipeline.science.prompt_handler import PromptHandler
 from pipeline.science.utils.craft_notes import CardsUtil    # CardsUtil.combine_cards, CardsUtil.find_indices_to_remove, CardsUtil.divide_into_groups, CardsUtil.locate_indices_to_sets
 
@@ -878,7 +878,6 @@ class Craft_notes:
             # print("\nThe list of chapters is: ", self.course_name_textbook_chapters["Chapters"])
             if(len(self.course_name_textbook_chapters["Chapters"]) <= 5 or len(self.course_name_textbook_chapters["Chapters"]) > 15):
                 print("\n\nThe number of chapters is less than 5. Please check the chapters.")
-                print("\n\nThe chapters are: ", self.course_name_textbook_chapters["Chapters"])
                 prompt = ChatPromptTemplate.from_template(
                     """
                     Requirements: \n\n\n

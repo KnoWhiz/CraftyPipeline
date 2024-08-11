@@ -83,6 +83,7 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
         # Craft notes parameters
         'craft_notes': craft_notes,
         'file_name': file_name,
+        'chunk_size': 2000,
     }
     topic_step = Topic(para)
     click.secho(f'Start generating topic {topic}... Course ID: {topic_step.course_id}', fg='green')
@@ -166,6 +167,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         # Craft notes parameters
         'craft_notes': craft_notes,
         'file_name': file_name,
+        'chunk_size': 2000,
     }
     chapter_hint = f' --chapter {para["chapter"]}' if para['chapter'] != -1 else (' --chapter 0' if short_video else '')
     short_video_hint = ' --short_video' if short_video else ''

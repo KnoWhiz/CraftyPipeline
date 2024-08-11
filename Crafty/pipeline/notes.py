@@ -36,7 +36,6 @@ class Notes(PipelineStep):
             self.semaphore = Semaphore(1)  
             self.read_meta_data_from_file()
 
-
     def execute(self):
         if(self.short_video == True):
             # Generate notes for short videos

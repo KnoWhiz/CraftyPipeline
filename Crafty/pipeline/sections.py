@@ -27,7 +27,11 @@ class Sections(PipelineStep):
         if os.path.exists(self.meta_dir + Config.META_AND_CHAPTERS):
             with open(self.meta_dir + Config.META_AND_CHAPTERS, 'r') as file:
                 meta_data = json.load(file)
-                self.zero_shot_topic = meta_data[Constants.ZERO_SHOT_TOPIC_KEY]
+                if(self.craft_notes != True):
+                    self.zero_shot_topic = meta_data[Constants.ZERO_SHOT_TOPIC_KEY]
+                else:
+                    # Temporary solution for the craft_topic named as zero_shot_topic
+                    self.zero_shot_topic = meta_data[Constants.CRAFT_TOPIC_KEY]
                 self.chapters_list = meta_data[Constants.CHAPTERS_KEY]
         else:
             raise FileNotFoundError(f"Chapter file not found in {self.meta_dir}")

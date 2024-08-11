@@ -9,7 +9,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from Crafty.config import Config
 from Crafty.pipeline.pipeline_step import PipelineStep
 
-
 class Topic(PipelineStep):
     def __init__(self, para):
         super().__init__(para)
@@ -24,6 +23,15 @@ class Topic(PipelineStep):
         self.short_video = para['short_video']
 
     def execute(self):
+        if(self.craft_notes != True):
+            response = self.prompt_topic()
+        else:
+            response = self.craft_topic()
+        with open(self.meta_dir + Config.META_AND_CHAPTERS, 'w') as file:
+            json.dump(response, file, indent=2)
+        click.echo(f'The meta data is saved in {self.meta_dir + Config.META_AND_CHAPTERS}')
+
+    def prompt_topic(self):
         parser = JsonOutputParser()
         error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
         prompt = ChatPromptTemplate.from_template(
@@ -55,6 +63,7 @@ class Topic(PipelineStep):
         chain = prompt | self.llm | error_parser
         response = chain.invoke({'course_info': self.course_info})
         response['short_video'] = self.short_video
-        with open(self.meta_dir + Config.META_AND_CHAPTERS, 'w') as file:
-            json.dump(response, file, indent=2)
-        click.echo(f'The meta data is saved in {self.meta_dir + Config.META_AND_CHAPTERS}')
+        return response
+
+    def craft_topic(self):
+        return self.docs.course_name_domain
