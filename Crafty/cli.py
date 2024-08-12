@@ -55,9 +55,10 @@ def cli():
 @click.option('--short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=False)
 @click.option('--craft_notes', is_flag=True, help='Generate content based on uploaded file by users.', required=False, default=False)
 @click.option('--file_name', type=str, help='The name of the file used when craft_notes is True.', required=False)
+@click.option('--language', type=str, help='The language of the content.', required=False, default='en')
 
 def create(topic, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, parallel_processing, advanced_model, sections_per_chapter, max_note_expansion_words, short_video, \
-           craft_notes, file_name):
+           craft_notes, file_name, language):
     if content_slide_pages is None:
         content_slide_pages = 2 if short_video else 30
     if sections_per_chapter < 5:
@@ -79,6 +80,7 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
         'sections_per_chapter': sections_per_chapter,
         'max_note_expansion_words': max_note_expansion_words,
         'short_video': short_video,
+        'language': language,
 
         # Craft notes parameters
         'craft_notes': craft_notes,
@@ -134,9 +136,10 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
 @click.option('--short_video', is_flag=True, help='Generate short videos instead of full-length videos.', required=False, default=False)
 @click.option('--craft_notes', is_flag=True, help='Generate content based on uploaded file by users.', required=False, default=False)
 @click.option('--file_name', type=str, help='The name of the file used when craft_notes is True.', required=False)
+@click.option('--language', type=str, help='The language of the content.', required=False, default='en')
 
 def step(step, topic, course_id, llm_source, temperature, creative_temperature, slides_template_file, slides_style, content_slide_pages, advanced_model, sections_per_chapter, max_note_expansion_words, chapter, short_video, \
-         craft_notes, file_name):
+         craft_notes, file_name, language):
     if short_video:
         click.echo("Running Crafty with the short video mode.")
     else:
@@ -163,6 +166,7 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         'max_note_expansion_words': max_note_expansion_words,
         'chapter': chapter,
         'short_video': short_video,
+        'language': language,
 
         # Craft notes parameters
         'craft_notes': craft_notes,

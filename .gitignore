@@ -24,3 +24,12 @@ outputs/
 *.html
 Crafty/pipeline/.DS_Store
 Crafty/.DS_Store
+Crafty/pipeline/templates/0.synctex.gz
+*.toc
+*.snm
+*.out
+*.nav
+*.log
+*.fls
+*.aux
+*.fdb_latexmk

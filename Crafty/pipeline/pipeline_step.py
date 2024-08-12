@@ -18,6 +18,7 @@ class PipelineStep(ABC):
         self.prompt = PromptHandler(self.api)
         self.llm_basic_context_window = self.api.models['basic']['context_window']
         self.llm_advance_context_window = self.api.models['advance']['context_window']
+        self.language = para['language']
 
         if 'course_id' in para:
             self.course_id = para['course_id']
