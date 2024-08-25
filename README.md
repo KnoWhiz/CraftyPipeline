@@ -88,10 +88,18 @@ The `create` command has several optional parameters that can be used to customi
 
 - `--max_note_expansion_words <int>`: This parameter sets the maximum number of words for note expansion. The default value is 500.
 
+- `--short_video`: This flag indicates whether to generate short videos.
+
+- `--language <str>`: This parameter sets the perfered language for all content generation. The default language is English ("en"), and also supports Chinese ("zh").
+
 These parameters can be used as follows:
 
 ```bash
 python Crafty/cli.py create --topic <topic> --temperature <float> --creative_temperature <float> --slides_template_file <str> --slides_style <str> --content_slide_pages <int> --parallel_processing --advanced_model --sections_per_chapter <int> --max_note_expansion_words <int>
+```
+
+```bash
+python Crafty/cli.py create --topic "I want to learn EM physics" --temperature 0.0 --creative_temperature 0.3 --slides_template_file "1"  --content_slide_pages 10 --parallel_processing --advanced_model --sections_per_chapter 10 --max_note_expansion_words 100 --language "zh"
 ```
 
 Replace `<topic>`, `<float>`, `<str>`, and `<int>` with the actual values you want to use. If you want to use the `--parallel_processing` or `--advanced_model` flags, simply include them in the command without a value.
