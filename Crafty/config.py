@@ -1,4 +1,5 @@
 class Config:
+    INPUT_DIR = "inputs/"
     OUTPUT_DIR = "outputs/"
     COURSE_META_DIR = "/course_meta/"
     NOTES_DIR = "/notes/"
@@ -12,6 +13,7 @@ class Config:
 
 class Constants:
     ZERO_SHOT_TOPIC_KEY = "zero_shot_topic"
+    CRAFT_TOPIC_KEY = "craft_topic"
     CHAPTERS_KEY = "Chapters"
     COURSE_NAME_KEY = "course_name"
     CHAPTER_LIST_KEY = "chapters_list"

@@ -2,10 +2,8 @@ import hashlib
 import json
 from typing import Dict, List, Any, Optional
 import os
-# import sys
 import logging
 import pandas as pd
-# from langchain_community.document_loaders import UnstructuredPDFLoader, PyPDFLoader,
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader
 from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -13,9 +11,8 @@ from langchain_community.vectorstores import Chroma
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 
-from pipeline.science.api_handler import ApiHandler
-from pipeline.science.prompt_handler import PromptHandler
-from pipeline.science.anki_handler import AnkiLoader
+from Crafty.pipeline.science.api_handler import ApiHandler
+from Crafty.pipeline.science.prompt_handler import PromptHandler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -50,7 +47,7 @@ class DocHandler:
         Parameters:
         - para (Dict[str, Any]): Configuration parameters including directories, filenames, and other settings.
         """
-        self.book_dir = para['book_dir']
+        self.book_dir = para['file_dir']
         self.main_filenames = self._ensure_list(para.get('main_filenames', []))
         self.chunk_size = int(para['chunk_size'])
         self.with_supplementary = para['supplementary_filenames'] is not None
@@ -58,15 +55,6 @@ class DocHandler:
         self.nMain = len(self.main_filenames)
         self.nSupp = len(self.supplementary_filenames)
         self.results_dir = para['results_dir']
-        self.course_id_mapping_file = para['course_id_mapping_file']
-        # Extract the directory path from the full file path
-        dir_path = os.path.dirname(para['course_id_mapping_file'])
-        print(dir_path)
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
-        if not os.path.exists(self.course_id_mapping_file):
-            with open(self.course_id_mapping_file, 'w') as f:
-                json.dump({}, f, indent=2)
         self.api = ApiHandler(para)
         self.prompt = PromptHandler(self.api)
         self._init_file_handling()
@@ -105,6 +93,9 @@ class DocHandler:
         self.main_file_dirs = [os.path.join(self.book_dir, file) for file in self.main_filenames]
         self.supplementary_file_dirs = [os.path.join(self.book_dir, file) for file in self.supplementary_filenames]
 
+        print(f"Main file directories: {self.main_file_dirs}")
+        print(f"Supplementary file directories: {self.supplementary_file_dirs}")
+
     def _extract_file_types(self):
         """
         Populates `main_file_types` and `supplementary_file_types` with the file types (extensions)
@@ -114,12 +105,11 @@ class DocHandler:
         self.main_file_types = [split_filename(file) for file in self.main_filenames]
         self.supplementary_file_types = [split_filename(file) for file in self.supplementary_filenames]
 
-    def _loader_map(self, pdf_loader=PyMuPDFLoader, docx_loader=Docx2txtLoader, apkg_loader=AnkiLoader):
+    def _loader_map(self, pdf_loader=PyMuPDFLoader, docx_loader=Docx2txtLoader):
         """Initializes the mapping of file types to their respective loaders."""
         self.loader_map = {
             'pdf': pdf_loader,
             'docx': docx_loader,
-            'apkg': apkg_loader,
         }
 
     def _load_files(self):
@@ -169,10 +159,6 @@ class DocHandler:
         Returns:
         - float: The percentage of blank pages within the document.
         """
-        # Skip quality check if the file is an Anki note deck. We should only accept Anki note decks as main files (not mixed).
-        if(type == 'apkg'):
-            return 0.0
-        
         if not doc or not hasattr(doc, "__iter__") or not len(doc):
             return 0.0
 
@@ -240,16 +226,6 @@ class DocHandler:
                 sha224_hash.update(page_text.page_content.encode("utf-8"))
         # Compute the final hash value
         self.course_id = sha224_hash.hexdigest()
-        # Load existing course IDs to check for duplicates
-        with open(self.course_id_mapping_file, 'r') as file:
-            self.existing_ids = json.load(file)
-        # Check if the generated course ID already exists
-        if self.course_id in self.existing_ids:
-            return True
-        # Save the new course ID with associated filenames if it's new
-        self.existing_ids[self.course_id] = self.main_filenames + self.supplementary_filenames
-        with open(self.course_id_mapping_file, "w") as outfile:
-            json.dump(self.existing_ids, outfile, indent=2)
         return False
 
     def _create_course_output_dirs(self):
@@ -262,16 +238,9 @@ class DocHandler:
         """
         # Check if course ID exists and create directories if it doesn't
         self.course_id_exist = self._hash_document_id()
-        # Define directory paths for different course outputs
-        self.test_dir = os.path.join(self.results_dir, "test", self.course_id)
-        self.quiz_dir = os.path.join(self.results_dir, "quiz", self.course_id)
-        self.note_dir = os.path.join(self.results_dir, "notes", self.course_id)
-        self.course_meta_dir = os.path.join(self.results_dir, "course_meta", self.course_id)
-        self.book_embedding_dir = os.path.join(self.results_dir, "book_embedding", self.course_id)
+        self.course_meta_dir = os.path.join(self.results_dir, "course_meta")
+        self.book_embedding_dir = os.path.join(self.results_dir, "book_embedding")
         if not self.course_id_exist:
-            os.makedirs(self.test_dir, exist_ok=True)
-            os.makedirs(self.quiz_dir, exist_ok=True)
-            os.makedirs(self.note_dir, exist_ok=True)
             os.makedirs(self.course_meta_dir, exist_ok=True)
             os.makedirs(self.book_embedding_dir, exist_ok=True)
 
@@ -485,15 +454,10 @@ class DocHandler:
         - str: The inferred course name and domain.
         """
         course_meta_file_path = os.path.join(self.course_meta_dir, "course_name_domain.txt")
+        chunk = self.prompt.split_prompt(str(doc[:pages]), model_version, return_first_chunk_only=True)[0]
+        self.textbook_content_pages = chunk
+        # self.textbook_content_pages = self.cont_page_docs[0]['contents_docs']
 
-        if (self.main_file_types[0] != 'apkg'):
-            chunk = self.prompt.split_prompt(str(doc[:pages]), model_version, return_first_chunk_only=True)[0]
-            self.textbook_content_pages = chunk
-            # self.textbook_content_pages = self.cont_page_docs[0]['contents_docs']
-        else:
-            chunk = str([page.anki_content["Question"] for page in doc])
-            self.textbook_content_pages = chunk
-            print("chunk: ", chunk)
         # Check if the course meta file exists and read from it if it does
         if os.path.exists(course_meta_file_path):
             with open(course_meta_file_path, 'r') as file:
@@ -501,11 +465,21 @@ class DocHandler:
                 return
         #infer course name
         llm = self.api.models[model_version]['instance']
-        parser1 = StrOutputParser()
+        # parser1 = StrOutputParser()
+        parser1 = JsonOutputParser()
         prompt1 = ChatPromptTemplate.from_template(
             """
             "Based on texts in the beginning of a course document, please provides the course name and its domain:"
             "\n\n book: {doc}."
+            The response should be formated as json:
+            ```json
+            {{
+            "context": <what is the context of this course>,
+            "level": <what is the level of this course>,
+            "subject": <what is the subject of this course>,
+            "craft_topic": <what is the zero_shot_topic of this course>
+            }}
+            ```
             """
         )
         # chain 1: input= doc and output= course_name
@@ -522,6 +496,6 @@ class DocHandler:
             response = chain1.invoke({'doc': summary})
             
         self.course_name_domain = response
-        with open(course_meta_file_path, 'w') as file:
-            file.write(self.course_name_domain)
+        # with open(course_meta_file_path, 'w') as file:
+        #     file.write(self.course_name_domain)
         return self.course_name_domain

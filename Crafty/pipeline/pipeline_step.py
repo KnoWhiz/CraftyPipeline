@@ -3,15 +3,21 @@ import os
 from abc import ABC, abstractmethod
 
 from Crafty.pipeline.science.api_handler import ApiHandler
+from Crafty.pipeline.science.doc_handler import DocHandler
+from Crafty.pipeline.science.prompt_handler import PromptHandler
 from Crafty.pipeline.utils.hash import HashUtil
 from config import Config, Constants
-
 
 class PipelineStep(ABC):
     def __init__(self, para):
         super().__init__()
         self.llm_basic = ApiHandler(para).models['basic']['instance']
         self.llm_advance = ApiHandler(para).models['advance']['instance']
+        self.api = ApiHandler(para)
+        self.prompt = PromptHandler(self.api)
+        self.llm_basic_context_window = self.api.models['basic']['context_window']
+        self.llm_advance_context_window = self.api.models['advance']['context_window']
+        self.language = para['language']
 
         if 'course_id' in para:
             self.course_id = para['course_id']
@@ -27,6 +33,19 @@ class PipelineStep(ABC):
         self.debug_dir = Config.OUTPUT_DIR + self.course_id + Config.DEBUG_DIR
         self.videos_dir = Config.OUTPUT_DIR + self.course_id + Config.VIDEOS_DIR
         self.final_dir = Config.OUTPUT_DIR + self.course_id + Config.FINAL_DIR
+
+        # If the user wants to craft the notes
+        self.craft_notes = para['craft_notes']
+        self.file_name = para['file_name']
+        if(self.craft_notes == True):
+            self.file_dir = Config.INPUT_DIR
+            para['file_dir'] = self.file_dir
+            para["results_dir"] = self.meta_dir
+            # Create a DocHandler instance, currently only one main file is supported
+            para['main_filenames'] = [self.file_name]
+            para['supplementary_filenames'] = []
+            self.docs = DocHandler(para)
+            self.main_embedding = self.docs.main_embedding[0]
 
     @abstractmethod
     def execute(self):
@@ -44,6 +63,10 @@ class PipelineStep(ABC):
         if os.path.exists(self.meta_dir + Config.META_AND_CHAPTERS):
             with open(self.meta_dir + Config.META_AND_CHAPTERS, 'r') as file:
                 meta_data = json.load(file)
-                self.zero_shot_topic = meta_data[Constants.ZERO_SHOT_TOPIC_KEY]
+                if(self.craft_notes != True):
+                    self.zero_shot_topic = meta_data[Constants.ZERO_SHOT_TOPIC_KEY]
+                else:
+                    # Temporary solution for the craft_topic named as zero_shot_topic
+                    self.zero_shot_topic = meta_data[Constants.CRAFT_TOPIC_KEY]
         else:
             raise FileNotFoundError(f"Chapter file not found in {self.meta_dir}")

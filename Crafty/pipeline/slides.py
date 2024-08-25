@@ -73,47 +73,76 @@ class Slides(PipelineStep):
 
         notes_xml = self.notes_dir + f'notes_set{notes_set_number}.xml'
         if os.path.exists(notes_xml):
-            with open(notes_xml, 'r') as xml_file:
+            with open(notes_xml, 'r', encoding='utf-8') as xml_file:
                 notes_set = xml_file.read()
         else:
             raise FileNotFoundError(f"Notes set file not found: {notes_xml}")
         
         parser = StrOutputParser()
         error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
-        prompt = ChatPromptTemplate.from_template(
-            """
-            As a short video YouTuber illustrating concept: ```{zero_shot_topic}```.
-            Based on the provided material: ```{notes_set}```.
-            Please follow the following steps and requirements to generate only {page_number} pages of slides.
-            Structure:
-            1. First page is the tile with the concept to illustrate
-            2. Second page is the explanation of this concept, just a few concise bullet points
-            Based on the template in latex format ```{tex_template}``` (But keep in mind that this is only a template, so do not need to include the information in it in your response unless it also shows in the provided material.)
-            Important: only response in pure correct latex format. Do not include "```" at the beginning and the end.
-            """)
+        if(self.language == 'en'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                As a short video YouTuber illustrating concept: ```{zero_shot_topic}```.
+                Based on the provided material: ```{notes_set}```.
+                Please follow the following steps and requirements to generate only {page_number} pages of slides.
+                Structure:
+                1. First page is the tile with the concept to illustrate
+                2. Second page is the explanation of this concept, just a few concise bullet points
+                Based on the template in latex format ```{tex_template}``` (But keep in mind that this is only a template, so do not need to include the information in it in your response unless it also shows in the provided material.)
+                Important: only response in pure correct latex format. Do not include "```" at the beginning and the end.
+                """)
+        elif(self.language == 'zh'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                用中文回答：
+                作为一个短视频YouTuber，说明概念：```{zero_shot_topic}```。
+                基于提供的材料：```{notes_set}```。
+                请按照以下步骤和要求生成仅有 {page_number} 页幻灯片。
+                结构：
+                1. 第一页是要说明的概念的标题
+                2. 第二页是这个概念的解释，只有几个简明的要点
+                基于latex格式的模板 ```{tex_template}```（但请记住，这只是一个模板，因此除非提供的材料中也显示在其中，否则不需要在响应中包含其中的信息。）
+                重要提示：只回复纯粹正确的latex格式。不要在开头和结尾处包含 "```"。
+                """)
+        else:
+            raise ValueError("Language is not supported.")
         chain = prompt | self.llm_basic | error_parser
         full_slides = chain.invoke({'zero_shot_topic': self.zero_shot_topic,
                                     'notes_set': notes_set,
                                     'page_number': self.content_slide_pages,
                                     'tex_template': slides_template})
-        prompt = ChatPromptTemplate.from_template(
-            """
-            For course ```{zero_shot_topic}``` and chapter ```{chapter}```.
-            Generate a description text for the slides for this lecture within 100 words.
-            Start with "This lecture ..." and make sure the generated content is closely tied to the content of the slide.
-            Lecture slides:
-            ```{full_slides}```
-            """)
+        if(self.language == 'en'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                For course ```{zero_shot_topic}``` and chapter ```{chapter}```.
+                Generate a description text for the slides for this lecture within 100 words.
+                Start with "This lecture ..." and make sure the generated content is closely tied to the content of the slide.
+                Lecture slides:
+                ```{full_slides}```
+                """)
+        elif(self.language == 'zh'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                用中文回答：
+                对于课程 ```{zero_shot_topic}``` 和章节 ```{chapter}```。
+                为本讲座的幻灯片生成一个100字以内的描述文本。
+                以 "本讲座 ..." 开头，并确保生成的内容与幻灯片的内容紧密相关。
+                讲座幻灯片：
+                ```{full_slides}```
+                """)
+        else:
+            raise ValueError("Language is not supported.")
         chain = prompt | self.llm_basic | error_parser
         video_description = chain.invoke({'zero_shot_topic': self.zero_shot_topic,
                                           'chapter': self.chapters_list[notes_set_number],
                                           'full_slides': full_slides})
-        with open(self.debug_dir + f"video_description_chapter_{notes_set_number}.json", 'w') as file:
-            json.dump(video_description, file, indent=2)
+        with open(self.debug_dir + f"video_description_chapter_{notes_set_number}.json", 'w', encoding='utf-8') as file:
+            json.dump(video_description, file, indent=2, ensure_ascii=False)
 
         # Save the response in a .tex file instead of a .txt file
         tex_path = self.videos_dir + f'full_slides_for_notes_set{notes_set_number}' + ".tex"
-        with open(tex_path, 'w') as file:
+        with open(tex_path, 'w', encoding='utf-8') as file:
             file.write(full_slides)
         click.echo(f'Tex file for chapter {notes_set_number} saved to: {tex_path}')
         return full_slides
@@ -128,7 +157,7 @@ class Slides(PipelineStep):
 
         notes_xml = self.notes_dir + f'notes_set{notes_set_number}.xml'
         if os.path.exists(notes_xml):
-            with open(notes_xml, 'r') as xml_file:
+            with open(notes_xml, 'r', encoding='utf-8') as xml_file:
                 notes_set = xml_file.read()
         else:
             raise FileNotFoundError(f"Notes set file not found: {notes_xml}")
@@ -136,28 +165,56 @@ class Slides(PipelineStep):
         # Send the prompt to the API and get a response
         parser = StrOutputParser()
         error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
-        prompt_1 = ChatPromptTemplate.from_template(
-            """
-            Requirements: \n\n\n
-            As a professor teaching course: ```{zero_shot_topic}```.
-            Based on the provided material: ```{notes_set}```.
-            Please follow the following steps and requirements to generate no more than {page_number} pages of slides for chapter ```{chapter}``` of this course.
-            Based on the template in latex format ```{tex_template}``` (But keep in mind that this is only a template, so do not need to include the information in it in your response unless it also shows in the provided material.):
-            Step 1: Use "Chapter {notes_set_number}: {chapter}" as first page. Specify the chapter number.
-            Step 2: Based on the provided material of notes set and chapter topic of this lecture, come out an outline for this lecture and put it as second page.
-                    Number of topics should be no more than 5. Topics will correspond to "section" in latex format. Topic names should be short and concise.
-            Step 3: Going though the topics of the chapter, generate the slides accordingly.
-                    For each topic, generate slides as follows:
-                        -> Page 1 to the end of this section:
-                        -> Devide this topic into several key concepts.
-                        -> Illustrate each one in a separate page frame (instead of subsection).
-                        Try to divide the whole illustration into several bullet points and sub-bullet points.
-                        -> Then do the same for the next topic (section).
-            Step 4: Generate the last 2 pages: one is the summary of this lecture, another one is the "Thank you" page in the end.
-            Requirement 1. Do not include any information not included in the provided material of notes set.
-            Requirement 2. Focus on illustration of the concepts and do not use figures or tables etc.
-            Requirement 3. Try to cover as much information in the provided material as you can.
-            """)
+        if(self.language == 'en'):
+            prompt_1 = ChatPromptTemplate.from_template(
+                """
+                Requirements: \n\n\n
+                As a professor teaching course: ```{zero_shot_topic}```.
+                Based on the provided material: ```{notes_set}```.
+                Please follow the following steps and requirements to generate no more than {page_number} pages of slides for chapter ```{chapter}``` of this course.
+                Based on the template in latex format ```{tex_template}``` (But keep in mind that this is only a template, so do not need to include the information in it in your response unless it also shows in the provided material.):
+                Step 1: Use "Chapter {notes_set_number}: {chapter}" as first page. Specify the chapter number.
+                Step 2: Based on the provided material of notes set and chapter topic of this lecture, come out an outline for this lecture and put it as second page.
+                        Number of topics should be no more than 5. Topics will correspond to "section" in latex format. Topic names should be short and concise.
+                Step 3: Going though the topics of the chapter, generate the slides accordingly.
+                        For each topic, generate slides as follows:
+                            -> Page 1 to the end of this section:
+                            -> Devide this topic into several key concepts.
+                            -> Illustrate each one in a separate page frame (instead of subsection).
+                            Try to divide the whole illustration into several bullet points and sub-bullet points.
+                            -> Then do the same for the next topic (section).
+                Step 4: Generate the last 2 pages: one is the summary of this lecture, another one is the "Thank you" page in the end.
+                Requirement 1. Do not include any information not included in the provided material of notes set.
+                Requirement 2. Focus on illustration of the concepts and do not use figures or tables etc.
+                Requirement 3. Try to cover as much information in the provided material as you can.
+                """)
+        elif(self.language == 'zh'):
+            prompt_1 = ChatPromptTemplate.from_template(
+                r"""
+                注意：对于中文支持
+                为了中文支持，请将模版中```\usepackage[utf8]{{inputenc}}```替换为```\\usepackage{{ctex}}```。
+                这样就可以确保文档中的中文内容能够正确显示和排版。
+
+                作为教授，教授课程：```{zero_shot_topic}```。
+                基于提供的材料：```{notes_set}```。
+                请按照以下步骤和要求为本课程的第 {chapter} 章生成不超过 {page_number} 页的幻灯片。
+                基于latex格式的模板 ```{tex_template}```（但请记住，这只是一个模板，因此除非提供的材料中也显示在其中，否则不需要在响应中包含其中的信息。）：
+                第1步：将“第 {notes_set_number} 章：{chapter}”作为第一页。指定章节编号。
+                第2步：根据提供的笔记集材料和本讲座的章节主题，为本讲座制定一个大纲并将其放在第二页。
+                        主题数量不应超过5个。主题将对应于latex格式中的“section”。主题名称应简短而简洁。
+                第3步：浏览章节的主题，相应地生成幻灯片。
+                        对于每个主题，生成幻灯片如下：
+                            -> 从本节的第1页到最后一页：
+                            -> 将此主题分为几个关键概念。
+                            -> 在单独的页面框架中（而不是子节）中说明每个概念。
+                            尝试将整个说明分为几个项目符号和子项目符号。
+                            -> 然后对下一个主题（部分）执行相同操作。
+                第4步：生成最后的2页：一是本讲座的摘要，另一是最后的“谢谢”页面。
+                要求1. 不要包含未包含在笔记集提供的材料中的任何信息。
+                要求2. 专注于概念的说明，不要使用图表等。
+                要求3. 尽可能涵盖提供的材料中的所有信息。""")
+        else:
+            raise ValueError("Language is not supported.")
         chain_1 = prompt_1 | self.llm_advance | error_parser
         full_slides_temp_1 = chain_1.invoke({'zero_shot_topic': self.zero_shot_topic,
                                              'notes_set': notes_set,
@@ -166,18 +223,38 @@ class Slides(PipelineStep):
                                              'chapter': self.chapters_list[notes_set_number],
                                              'notes_set_number': notes_set_number})
 
-        prompt_2 = ChatPromptTemplate.from_template(
-            """
-            Requirements: \n\n\n
-            ```{full_slides_temp_1}``` is the slides in latex format generated for course: ```{zero_shot_topic}```.
-            As a professor teaching this course, based on the provided material: ```{notes_set}``` and chapter name: ```{chapter}```.
-            Please combine and refine the generated tex file above from step 1 to 4. Make sure your final output follows the following requirements:
-            Requirement 0: Do not delete or add any pages from the generated slides.
-            Requirement 1. Only response in latex format. This file should be able to be directly compiled, so do not include anything like "```" in response.
-            Requirement 2. Do not include any information not included in the provided material of notes set.
-            Requirement 3. Focus on illustration of the concepts and do not use figures or tables etc.
-            Requirement 4. Try to cover as much information in the provided material as you can.
-            """)
+        if(self.language == 'en'):
+            prompt_2 = ChatPromptTemplate.from_template(
+                """
+                Requirements: \n\n\n
+                ```{full_slides_temp_1}``` is the slides in latex format generated for course: ```{zero_shot_topic}```.
+                As a professor teaching this course, based on the provided material: ```{notes_set}``` and chapter name: ```{chapter}```.
+                Please combine and refine the generated tex file above from step 1 to 4. Make sure your final output follows the following requirements:
+                Requirement 0: Do not delete or add any pages from the generated slides.
+                Requirement 1. Only response in latex format. This file should be able to be directly compiled, so do not include anything like "```" in response.
+                Requirement 2. Do not include any information not included in the provided material of notes set.
+                Requirement 3. Focus on illustration of the concepts and do not use figures or tables etc.
+                Requirement 4. Try to cover as much information in the provided material as you can.
+                """)
+        elif(self.language == 'zh'):
+            prompt_2 = ChatPromptTemplate.from_template(
+                r"""
+                需求: \n\n\n
+                注意：对于中文支持
+                为了中文支持，请将模版中```\usepackage[utf8]{{inputenc}}```替换为```\\usepackage{{ctex}}```。
+                这样就可以确保文档中的中文内容能够正确显示和排版。
+
+                ```{full_slides_temp_1}``` 是为课程：```{zero_shot_topic}```生成的latex格式幻灯片。
+                作为教授教授这门课程，基于提供的材料：```{notes_set}```和章节名称：```{chapter}```。
+                请将上述步骤1到4生成的tex文件组合并完善。确保您的最终输出符合以下要求：
+                要求0：不要从生成的幻灯片中删除或添加任何页面。
+                要求1. 只回复latex格式。此文件应能够直接编译，因此在响应中不要包含任何类似“```”的内容。
+                要求2. 不要包含未包含在笔记集提供的材料中的任何信息。
+                要求3. 专注于概念的说明，不要使用图表等。
+                要求4. 尽可能涵盖提供的材料中的所有信息。
+                """)
+        else:
+            raise ValueError("Language is not supported.")
         chain_2 = prompt_2 | self.llm_advance | error_parser
         full_slides_temp_2 = chain_2.invoke({'zero_shot_topic': self.zero_shot_topic,
                                              'notes_set': notes_set,
@@ -187,19 +264,40 @@ class Slides(PipelineStep):
                                              'notes_set_number': notes_set_number,
                                              'full_slides_temp_1': full_slides_temp_1})
 
-        prompt_3 = ChatPromptTemplate.from_template(
-            """
-            Requirements: \n\n\n
-            ```{full_slides_temp_2}``` are the slides in latex format generated for course: ```{zero_shot_topic}```.
-            As a professor teaching this course, based on the provided material: ```{notes_set}``` and chapter name: ```{chapter}```.
-            Please refine the generated tex file. Make sure your final output follows the following requirements:
-            Requirement 0: Do not delete or add any pages from the generated slides.
-            Requirement 1. Only response in latex format. This file should be able to be directly compiled, so do not include anything like "```" in response.
-            Requirement 2. Going through each page of the generated slides, make sure each concept is well explained. Add more examples if needed.
-            Requirement 3. Make sure the slides as a whole is self-consistent, that means the reader can get all the information from the slides without any missing parts.
-            Requirement 4. Recheck the tex format to make sure it is correct as a whole.
-            Requirement 5. Build hyperlinks between the outline slide and the corresponding topic slides.
-            """)
+        if(self.language == 'en'):
+            prompt_3 = ChatPromptTemplate.from_template(
+                """
+                Requirements: \n\n\n
+                ```{full_slides_temp_2}``` are the slides in latex format generated for course: ```{zero_shot_topic}```.
+                As a professor teaching this course, based on the provided material: ```{notes_set}``` and chapter name: ```{chapter}```.
+                Please refine the generated tex file. Make sure your final output follows the following requirements:
+                Requirement 0: Do not delete or add any pages from the generated slides.
+                Requirement 1. Only response in latex format. This file should be able to be directly compiled, so do not include anything like "```" in response.
+                Requirement 2. Going through each page of the generated slides, make sure each concept is well explained. Add more examples if needed.
+                Requirement 3. Make sure the slides as a whole is self-consistent, that means the reader can get all the information from the slides without any missing parts.
+                Requirement 4. Recheck the tex format to make sure it is correct as a whole.
+                Requirement 5. Build hyperlinks between the outline slide and the corresponding topic slides.
+                """)
+        elif(self.language == 'zh'):
+            prompt_3 = ChatPromptTemplate.from_template(
+                r"""
+                需求: \n\n\n
+                注意：对于中文支持
+                为了中文支持，请将模版中```\usepackage[utf8]{{inputenc}}```替换为```\\usepackage{{ctex}}```。
+                这样就可以确保文档中的中文内容能够正确显示和排版。
+
+                ```{full_slides_temp_2}``` 是为课程：```{zero_shot_topic}```生成的latex格式幻灯片。
+                作为教授教授这门课程，基于提供的材料：```{notes_set}```和章节名称：```{chapter}```。
+                请完善生成的tex文件。确保您的最终输出符合以下要求：
+                要求0：不要从生成的幻灯片中删除或添加任何页面。
+                要求1. 只回复latex格式。此文件应能够直接编译，因此在响应中不要包含任何类似“```”的内容。
+                要求2. 仔细检查生成的幻灯片的每一页，确保每个概念都得到很好的解释。如果需要，添加更多示例。
+                要求3. 确保幻灯片作为一个整体是自洽的，这意味着读者可以从幻灯片中获得所有信息，而没有任何遗漏的部分。
+                要求4. 重新检查tex格式，确保它作为一个整体是正确的。
+                要求5. 在大纲幻灯片和相应主题幻灯片之间建立超链接。
+                """)
+        else:
+            raise ValueError("Language is not supported.")
         chain_3 = prompt_3 | self.llm_advance | error_parser
         full_slides_temp_3 = chain_3.invoke({'zero_shot_topic': self.zero_shot_topic,
                                              'notes_set': notes_set,
@@ -209,23 +307,48 @@ class Slides(PipelineStep):
                                              'notes_set_number': notes_set_number,
                                              'full_slides_temp_2': full_slides_temp_2})
 
-        prompt_4 = ChatPromptTemplate.from_template(
-            """
-            Requirements: \n\n\n
-            For latex ```{full_slides_temp_3}``` please check latex grammar and spelling errors. Fix them if any.
+        if(self.language == 'en'):
+            prompt_4 = ChatPromptTemplate.from_template(
+                """
+                Requirements: \n\n\n
+                For latex ```{full_slides_temp_3}``` please check latex grammar and spelling errors. Fix them if any.
 
-            Then for each topic (latex section) in the slides, do the following:
-                -> Page 1: Insert a single blank page with the topic name on top only.
-                    instead of ```\begin{{frame}}{{}}
-                                    \centering
-                                    <topic name>
-                                \end{{frame}}```
-                    use ```\begin{{frame}}{{<topic name>}}
-                        \end{{frame}}``` as the blank page.
-                -> Page 2 to the end: original pages.
-            And do not include anything like "```" in response.
-            Reply with the final slides in latex format purely.
-            """)
+                Then for each topic (latex section) in the slides, do the following:
+                    -> Page 1: Insert a single blank page with the topic name on top only.
+                        instead of ```\begin{{frame}}{{}}
+                                        \centering
+                                        <topic name>
+                                    \end{{frame}}```
+                        use ```\begin{{frame}}{{<topic name>}}
+                            \end{{frame}}``` as the blank page.
+                    -> Page 2 to the end: original pages.
+                And do not include anything like "```" in response.
+                Reply with the final slides in latex format purely.
+                """)
+        elif(self.language == 'zh'):
+            prompt_4 = ChatPromptTemplate.from_template(
+                r"""
+                需求: \n\n\n
+                注意：对于中文支持
+                为了中文支持，请将模版中```\usepackage[utf8]{{inputenc}}```替换为```\\usepackage{{ctex}}```。
+                这样就可以确保文档中的中文内容能够正确显示和排版。
+
+                对于latex ```{full_slides_temp_3}```，请检查latex语法和拼写错误。如果有，请修复。
+
+                然后对幻灯片中的每个主题（latex部分）执行以下操作：
+                    -> 第1页：插入一个仅有主题名称的空白页。
+                        而不是 ```\begin{{frame}}{{}}
+                                        \centering
+                                        <topic name>
+                                    \end{{frame}}```
+                        使用 ```\begin{{frame}}{{<topic name>}}
+                            \end{{frame}}``` 作为空白页。
+                    -> 第2页到最后一页：原始页面。
+                并且在响应中不要包含任何类似“```”的内容。
+                以纯粹的latex格式回复最终幻灯片。
+                """)
+        else:
+            raise ValueError("Language is not supported.")
         chain_4 = prompt_4 | self.llm_advance | error_parser
         full_slides = chain_4.invoke({'zero_shot_topic': self.zero_shot_topic,
                                       'notes_set': notes_set,
@@ -235,24 +358,37 @@ class Slides(PipelineStep):
                                       'notes_set_number': notes_set_number,
                                       'full_slides_temp_3': full_slides_temp_3})
 
-        prompt = ChatPromptTemplate.from_template(
-            """
-            For course ```{zero_shot_topic}``` and chapter ```{chapter}```.
-            Generate a description text for the slides for this lecture within 100 words.
-            Start with "This lecture ..." and make sure the generated content is closely tied to the content of the slide.
-            Lecture slides:
-            ```{full_slides}```
-            """)
+        if(self.language == 'en'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                For course ```{zero_shot_topic}``` and chapter ```{chapter}```.
+                Generate a description text for the slides for this lecture within 100 words.
+                Start with "This lecture ..." and make sure the generated content is closely tied to the content of the slide.
+                Lecture slides:
+                ```{full_slides}```
+                """)
+        elif(self.language == 'zh'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                用中文回答：
+                对于课程 ```{zero_shot_topic}``` 和章节 ```{chapter}```。
+                为本讲座的幻灯片生成一个100字以内的描述文本。
+                以 "本讲座 ..." 开头，并确保生成的内容与幻灯片的内容紧密相关。
+                讲座幻灯片：
+                ```{full_slides}```
+                """)
+        else:
+            raise ValueError("Language is not supported.")
         chain = prompt | self.llm_basic | error_parser
         video_description = chain.invoke({'zero_shot_topic': self.zero_shot_topic,
                                           'chapter': self.chapters_list[notes_set_number],
                                           'full_slides': full_slides})
-        with open(self.debug_dir + f"video_description_chapter_{notes_set_number}.json", 'w') as file:
-            json.dump(video_description, file, indent=2)
+        with open(self.debug_dir + f"video_description_chapter_{notes_set_number}.json", 'w', encoding='utf-8') as file:
+            json.dump(video_description, file, indent=2, ensure_ascii=False)
 
         # Save the response in a .tex file instead of a .txt file
         tex_path = self.videos_dir + f'full_slides_for_notes_set{notes_set_number}' + ".tex"
-        with open(tex_path, 'w') as file:
+        with open(tex_path, 'w', encoding='utf-8') as file:
             file.write(full_slides)
         click.echo(f'Tex file for chapter {notes_set_number} saved to: {tex_path}')
         return full_slides
@@ -290,13 +426,24 @@ class Slides(PipelineStep):
         """
         parser = StrOutputParser()
         error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_advance)
-        prompt_1 = ChatPromptTemplate.from_template(
-            """
-            For concept: ```{input}``` in course: {zero_shot_topic}, chapter: {chapter}.
-            Write a new visual prompt for DALL-E while avoiding any mention of books, signs, titles, text, and words etc.
-            Do not include any technical terms, just a simple description.
-            Give a graphic description representation of the concept.
-            """)
+        if(self.language == 'en'):
+            prompt_1 = ChatPromptTemplate.from_template(
+                """
+                For concept: ```{input}``` in course: {zero_shot_topic}, chapter: {chapter}.
+                Write a new visual prompt for DALL-E while avoiding any mention of books, signs, titles, text, and words etc.
+                Do not include any technical terms, just a simple description.
+                Give a graphic description representation of the concept.
+                """)
+        elif(self.language == 'zh'):
+            prompt_1 = ChatPromptTemplate.from_template(
+                """
+                对于课程：{zero_shot_topic}，章节：{chapter}中的概念：```{input}```。
+                为DALL-E编写一个新的视觉提示，同时避免提及书籍、标志、标题、文本和文字等。
+                不要包含任何技术术语，只需简单的描述。
+                给出概念的图形描述。
+                """)
+        else:
+            raise ValueError("Language is not supported.")
         chain_1 = prompt_1 | self.llm_advance | error_parser
         prompt = chain_1.invoke({'input': prompt, 'zero_shot_topic': self.zero_shot_topic, 'chapter': self.chapters_list[notes_set_number]})
 
@@ -320,14 +467,26 @@ class Slides(PipelineStep):
                 print(f"OpenAI API request was invalid, retrying with default prompt: {e}")
                 parser = StrOutputParser()
                 error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_advance)
-                prompt_2 = ChatPromptTemplate.from_template(
-                    """
-                    For course: {zero_shot_topic}, chapter: {chapter}.
-                    Write a new visual prompt for DALL-E while avoiding any mention of books, signs, titles, text, and words etc.
-                    Do not include any technical terms, just a simple description.
-                    Give a graphic description representation of the concept.
-                    Since OpenAI API request was invalid for the previous prompt, try to keep the description safe and harmonious.
-                    """)
+                if(self.language == 'en'):
+                    prompt_2 = ChatPromptTemplate.from_template(
+                        """
+                        For course: {zero_shot_topic}, chapter: {chapter}.
+                        Write a new visual prompt for DALL-E while avoiding any mention of books, signs, titles, text, and words etc.
+                        Do not include any technical terms, just a simple description.
+                        Give a graphic description representation of the concept.
+                        Since OpenAI API request was invalid for the previous prompt, try to keep the description safe and harmonious.
+                        """)
+                elif(self.language == 'zh'):
+                    prompt_2 = ChatPromptTemplate.from_template(
+                        """
+                        对于课程：{zero_shot_topic}，章节：{chapter}。
+                        为DALL-E编写一个新的视觉提示，同时避免提及书籍、标志、标题、文本和文字等。
+                        不要包含任何技术术语，只需简单的描述。
+                        给出概念的图形描述。
+                        由于上一个提示的OpenAI API请求无效，请尽量保持描述的安全和和谐。
+                        """)
+                else:
+                    raise ValueError("Language is not supported.")
                 chain_2 = prompt_2 | self.llm_advance | error_parser
                 prompt = chain_2.invoke({'zero_shot_topic': self.zero_shot_topic, 'chapter': self.chapters_list[notes_set_number]})
 
@@ -353,7 +512,7 @@ class Slides(PipelineStep):
         images = [img for img in os.listdir(self.debug_dir) if re.match(image_file_pattern, img)]
         images.sort(key=lambda x: int(x.split('_')[-1].split('.')[0]))
 
-        with open(latex_file_path, 'r') as file:
+        with open(latex_file_path, 'r', encoding='utf-8') as file:
             latex_content = file.readlines()
 
         modified_content, frame_content = [], []
@@ -380,7 +539,7 @@ class Slides(PipelineStep):
                 frame_content.append(line)
             else:
                 modified_content.append(line)
-        with open(latex_file_path, 'w') as file:
+        with open(latex_file_path, 'w', encoding='utf-8') as file:
             file.writelines(modified_content)
         click.echo(f'Tex file {latex_file_path} updated for images insertion.')
 
@@ -390,6 +549,6 @@ class Slides(PipelineStep):
         # Your command to run xelatex
         command = ['/Library/TeX/texbin/xelatex', latex_file_path]
         # Run subprocess with cwd set to the directory of the .tex file
-        with open(self.debug_dir + tex_name + '.log', 'w') as log:
+        with open(self.debug_dir + tex_name + '.log', 'w', encoding='utf-8') as log:
             subprocess.run(command, cwd=os.path.dirname(latex_file_path), stdout=log)
             click.echo(f'PDF file for note set {notes_set_number} saved to: {self.videos_dir}{tex_name.replace(".tex", ".pdf")}')

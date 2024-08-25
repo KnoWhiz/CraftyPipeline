@@ -1,3 +1,5 @@
+import os
+import json
 import asyncio
 from asyncio import Semaphore       # for rate limiting
 
@@ -5,9 +7,10 @@ import xml.etree.ElementTree as ET
 
 import click
 from langchain.output_parsers import OutputFixingParser
-from langchain_core.output_parsers import XMLOutputParser
+from langchain_core.output_parsers import XMLOutputParser, StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
+from Crafty.config import Config, Constants
 from Crafty.pipeline.pipeline_step import PipelineStep
 from Crafty.pipeline.utils.xml import XmlUtil
 
@@ -17,8 +20,30 @@ class Notes(PipelineStep):
         super().__init__(para)
 
         self.short_video = para['short_video']
-        self.zero_shot_topic = para['topic']
-        self.chapters_list = [self.zero_shot_topic]
+        # self.zero_shot_topic = para['topic']
+        # self.chapters_list = [self.zero_shot_topic]
+
+        if os.path.exists(self.meta_dir + Config.META_AND_CHAPTERS):
+            with open(self.meta_dir + Config.META_AND_CHAPTERS, 'r') as file:
+                meta_data = json.load(file)
+                if(self.craft_notes != True):
+                    self.zero_shot_topic = meta_data[Constants.ZERO_SHOT_TOPIC_KEY]
+                else:
+                    # Temporary solution for the craft_topic named as zero_shot_topic
+                    self.zero_shot_topic = meta_data[Constants.CRAFT_TOPIC_KEY]
+        else:
+            raise FileNotFoundError(f"Topic file not found in {self.meta_dir}")
+        
+        if os.path.exists(self.notes_dir + Config.CHAPTERS_AND_SECTIONS):
+            with open(self.notes_dir + Config.CHAPTERS_AND_SECTIONS, 'r') as json_file:
+                chapters_and_sections = json.load(json_file)
+                self.chapters_list = chapters_and_sections[Constants.CHAPTER_LIST_KEY]
+                self.sections_list = chapters_and_sections[Constants.SECTION_LIST_KEY]
+        else:
+            raise FileNotFoundError(f"Chapter and section file not found in {self.notes_dir}")
+
+        print("Chapters list: ", self.chapters_list)
+        print("Sections list: ", self.sections_list)
 
         self.topic = para['topic']
         self.regions = ["Overview", "Examples", "Essentiality"]
@@ -35,7 +60,6 @@ class Notes(PipelineStep):
         else:
             self.semaphore = Semaphore(1)  
             self.read_meta_data_from_file()
-
 
     def execute(self):
         if(self.short_video == True):
@@ -61,7 +85,16 @@ class Notes(PipelineStep):
             chapter_name = self.chapters_list[self.chapter]
             sections = self.sections_list[self.chapter]
 
-            notes_exp = self.robust_generate_expansions(chapter_name, sections, 5)
+            if(self.craft_notes != True):
+                notes_exp = self.robust_generate_expansions(chapter_name, sections, 5)
+            else:
+                self.find_sections_docs()
+                notes_exp = self.craft_generate_expansions(self.llm, sections, \
+                                                           self.sections_qdocs, \
+                                                           self.sections_list[self.chapter], \
+                                                           self.zero_shot_topic, \
+                                                           self.max_note_expansion_words, \
+                                                           self.max_note_expansion_words)
 
             # Convert notes_exp to XML format
             notes_exp_xml = XmlUtil.dict_to_xml('notes_expansion', notes_exp)
@@ -85,16 +118,30 @@ class Notes(PipelineStep):
 
         parser = XMLOutputParser()
         error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
-        prompt = ChatPromptTemplate.from_template(
-            """
-            Your task is to indentify a single key points in the given prompt: {input_prompt} and provide explanations for that point.
-            Format the output in XML format as follows:
-            ----------------
-            {output_instructions}
-            ----------------
-            Max words for expansion: {expansion_length}
-            """
-        )
+        if(self.language == 'en'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                Your task is to indentify a single key points in the given prompt: {input_prompt} and provide explanations for that point.
+                Format the output in XML format as follows:
+                ----------------
+                {output_instructions}
+                ----------------
+                Max words for expansion: {expansion_length}
+                """
+            )
+        elif(self.language == 'zh'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                用中文回答：
+                你的任务是识别给定提示中的一个关键点: {input_prompt} 并为该点提供解释。
+                请按以下格式提供输出:
+                ----------------
+                {output_instructions}
+                ----------------
+                扩展的最大字数: {expansion_length}
+                """)
+        else:
+            raise ValueError("Language is not supported.")
         chain = prompt | self.llm | error_parser
         results = chain.invoke(inputs)
         return dict(zip([input_prompt], [results]))
@@ -141,21 +188,175 @@ class Notes(PipelineStep):
 
             parser = XMLOutputParser()
             error_parser = OutputFixingParser.from_llm(parser=parser, llm=self.llm_basic)
-            prompt = ChatPromptTemplate.from_template(
-                """
-                Course name: {course_name}
-                Chapter name: {chapter_name}
-                Your task is to provide expansions covering regions: {regions} for the given section: {section}
-                Format the output in XML format as follows:
-                ----------------
-                {output_instructions}
-                ----------------
-                Max words for expansion: {expansion_length}
-                """
-            )
+            if(self.language == 'en'):
+                prompt = ChatPromptTemplate.from_template(
+                    """
+                    Course name: {course_name}
+                    Chapter name: {chapter_name}
+                    Your task is to provide expansions covering regions: {regions} for the given section: {section}
+                    Format the output in XML format as follows:
+                    ----------------
+                    {output_instructions}
+                    ----------------
+                    Max words for expansion: {expansion_length}
+                    """
+                )
+            elif(self.language == 'zh'):
+                prompt = ChatPromptTemplate.from_template(
+                    """
+                    用中文回答：
+                    课程名称: {course_name}
+                    章节名称: {chapter_name}
+                    你的任务是为给定章节: {section} 提供涵盖区域: {regions} 的扩展
+                    请按以下格式提供输出:
+                    ----------------
+                    {output_instructions}
+                    ----------------
+                    扩展的最大字数: {expansion_length}
+                    """)
+            else:
+                raise ValueError("Language is not supported.")
         chain = prompt | self.llm | error_parser
         results = await chain.abatch(inputs)
 
         final_roots = XmlUtil.nest_dict_to_xml(results)
 
         return dict(zip(sections, final_roots))
+    
+    def find_sections_docs(self):
+        embed_book = self.main_embedding
+        self.sections_qdocs = []
+        for i in range(len(self.chapters_list)):
+            print("\nSearching qdocs for chapter: ", i)
+            sections_temp = self.sections_list[i]
+            file_path = os.path.join(self.meta_dir, f'main_qdocs_set{i}.json')
+            if not os.path.exists(file_path):
+                qdocs_list_temp = []
+                for section in sections_temp:
+                    docs = embed_book.similarity_search(section, k=4)
+                    print("\nDocs for section: ", section)
+                    # print("\nDocs: ", docs)
+                    qdocs = "".join([docs[i].page_content for i in range(len(docs))])
+                    qdocs = qdocs.replace('\u2022', '').replace('\n', '').replace('\no', '').replace('. .', '')
+                    qdocs_list_temp.append(qdocs)
+                self.sections_qdocs.append(qdocs_list_temp)
+                with open(file_path, 'w', encoding='utf-8') as file:
+                    json.dump(dict(zip(sections_temp, qdocs_list_temp)), file, indent=2, ensure_ascii=False)
+            else:
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    qdocs_list_dict_temp = json.load(file)
+                    extracted_qdocs = [qdocs_list_dict_temp[key] for key in sections_temp]
+                    self.sections_qdocs.append(extracted_qdocs)
+
+        file_path = os.path.join(self.meta_dir, 'sections_docs.json')
+        with open(file_path, 'w', encoding='utf-8') as file:
+            json.dump(self.sections_qdocs, file, indent=2, ensure_ascii=False)
+
+    def craft_generate_expansions(self, llm, sections, texts, defs, course_name_domain, max_words_craft_notes, max_words_expansion, max_attempts = 3, regions = ["Outline", "Examples", "Essentiality"]):
+        attempt = 0
+        while attempt < max_attempts:
+            try:
+                return asyncio.run(self.craft_generate_expansions_async(llm, sections, texts, defs, course_name_domain, max_words_craft_notes, max_words_expansion, regions))
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed for generating expansions: {e}")
+                attempt += 1
+                if attempt == max_attempts:
+                    print(f"Failed to generate expansions after {max_attempts} attempts.")
+                    # Return None or raise an exception depending on how you want to handle complete failure.
+                    raise Exception(f"Expansions generation failed after {max_attempts} attempts.")
+
+    async def craft_generate_expansions_async(self, llm, sections, texts, defs, course_name_domain, max_words_craft_notes, max_words_expansion, \
+                                        regions = ["Outline", "Examples", "Essentiality"]):
+        def format_string(regions):
+            markdown_content = "\n".join([f'### {region}\n\nExample content for {region}.\n' for region in regions])
+            markdown_format_string = f"""
+            {markdown_content}
+            """
+            return markdown_format_string
+        markdown_format_string = format_string(regions)
+
+        inputs = [{
+            "max_words_expansion": max_words_expansion,
+            "text": text,
+            "definition": definition,
+            "section": section,
+            "course_name_domain": course_name_domain,
+            "markdown_format_string": markdown_format_string,
+        } for text, section, definition in zip(texts, sections, defs)]
+        parser = StrOutputParser()
+        error_parser = OutputFixingParser.from_llm(parser=parser, llm=llm)
+        if(self.language == 'en'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                For the course: {course_name_domain}, provide the expansions with a few pre-defined regions for the section: {section}.
+                {section}'s definition is: {definition}.
+                
+                Generate expansions based on the given context as below:
+                Context to extract section definition: {text}.
+                Max words for expansion: {max_words_expansion}
+                It should formated as markdown:
+                {markdown_format_string}
+
+                1. The first region is "Outline" which should be some really brief bullet points about the following content around that sections.
+                2. If the concept can be better explained by formulas, use LaTeX syntax in markdown, like:
+                    ----------------
+                    $$
+                    \frac{{a}}{{b}} = \frac{{c}}{{d}}
+                    $$
+                    ----------------
+                3. If you find you need to add tables, use markdown format, like:
+                    ----------------
+                    ### Example Table
+
+                    | Header 1   | Header 2   | Header 3   |
+                    |------------|------------|------------|
+                    | Row 1 Col 1| Row 1 Col 2| Row 1 Col 3|
+                    | Row 2 Col 1| Row 2 Col 2| Row 2 Col 3|
+                    | Row 3 Col 1| Row 3 Col 2| Row 3 Col 3|
+                    ----------------
+
+                4. Do not include "```markdown" in the response. Final whole response must be in correct markdown format.
+                5. Specify the text with intuitive markdown syntax like bold, italic, etc, bullet points, etc.
+                6. For in-line formulas, use the syntax: $E = mc^2$. Remember must use double ```$``` for display formulas.
+                """
+            )
+        elif(self.language == 'zh'):
+            prompt = ChatPromptTemplate.from_template(
+                """
+                用中文回答：
+                对于课程: {course_name_domain}，为部分: {section} 提供一些预定义区域的扩展。
+                {section} 的定义是: {definition}。
+                
+                根据以下上下文生成扩展:
+                提取部分定义的上下文: {text}.
+                扩展的最大字数: {max_words_expansion}
+                它应该格式化为markdown:
+                {markdown_format_string}
+
+                1. 第一个区域是“大纲”，应该是关于该部分周围内容的一些非常简要的要点。
+                2. 如果概念可以通过公式更好地解释，请在markdown中使用LaTeX语法，如：
+                    ----------------
+                    $$
+                    \frac{{a}}{{b}} = \frac{{c}}{{d}}
+                    $$
+                    ----------------
+                3. 如果您发现需要添加表格，请使用markdown格式，如：
+                    ----------------
+                    ### 例子表
+
+                    | 标题 1   | 标题 2   | 标题 3   |
+                    |------------|------------|------------|
+                    | 行 1 列 1| 行 1 列 2| 行 1 列 3|
+                    | 行 2 列 1| 行 2 列 2| 行 2 列 3|
+                    | 行 3 列 1| 行 3 列 2| 行 3 列 3|
+                    ----------------
+
+                4. 不要在响应中包含“```markdown”。最终整个响应必须以正确的markdown格式。
+                5. 使用直观的markdown语法，如粗体，斜体，项目符号等，指定文本。
+                6. 对于行内公式，请使用语法：$E = mc^2$。记住必须使用双```$```显示公式。
+                """)
+        else:
+            raise ValueError("Language is not supported.")
+        chain = prompt | llm | error_parser
+        results = await chain.abatch(inputs)
+        return dict(zip(sections, results))
