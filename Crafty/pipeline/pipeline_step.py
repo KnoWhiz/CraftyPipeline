@@ -8,7 +8,6 @@ from Crafty.pipeline.science.prompt_handler import PromptHandler
 from Crafty.pipeline.utils.hash import HashUtil
 from config import Config, Constants
 
-
 class PipelineStep(ABC):
     def __init__(self, para):
         super().__init__()

@@ -190,14 +190,9 @@ class Slides(PipelineStep):
                 """)
         elif(self.language == 'zh'):
             prompt_1 = ChatPromptTemplate.from_template(
-                """
+                r"""
                 注意：对于中文支持
-                在LaTeX中，CJKutf8包 是专门为排版CJK（中文、日文、韩文）字符设计的。
-                这意味着使用该包后，LaTeX在编译文档时可以正确处理中文文本，确保字符显示正确。通过```\\usepackage{{CJKutf8}}```命令引入该包。
-                使用```\\setCJKmainfont{{PingFang SC}}  % 你可以根据自己的系统更改字体```命令设置中文字体。
-
-                CJK环境 是指通过在内容外部包裹 ```\\begin{{CJK}}{{UTF8}}{{gbsn}}``` 和 ```\\end{{CJK}}``` 这对命令，
-                您告诉LaTeX系统：此环境中的文本应使用UTF-8编码来处理，并使用特定的中文字体（例如 gbsn 适用于简体中文）。
+                为了中文支持，请将模版中```\usepackage[utf8]{{inputenc}}```替换为```\\usepackage{{ctex}}```。
                 这样就可以确保文档中的中文内容能够正确显示和排版。
 
                 作为教授，教授课程：```{zero_shot_topic}```。
@@ -217,8 +212,7 @@ class Slides(PipelineStep):
                 第4步：生成最后的2页：一是本讲座的摘要，另一是最后的“谢谢”页面。
                 要求1. 不要包含未包含在笔记集提供的材料中的任何信息。
                 要求2. 专注于概念的说明，不要使用图表等。
-                要求3. 尽可能涵盖提供的材料中的所有信息。
-                """)
+                要求3. 尽可能涵盖提供的材料中的所有信息。""")
         else:
             raise ValueError("Language is not supported.")
         chain_1 = prompt_1 | self.llm_advance | error_parser
@@ -244,15 +238,10 @@ class Slides(PipelineStep):
                 """)
         elif(self.language == 'zh'):
             prompt_2 = ChatPromptTemplate.from_template(
-                """
+                r"""
                 需求: \n\n\n
                 注意：对于中文支持
-                在LaTeX中，CJKutf8包 是专门为排版CJK（中文、日文、韩文）字符设计的。
-                这意味着使用该包后，LaTeX在编译文档时可以正确处理中文文本，确保字符显示正确。通过```\\usepackage{{CJKutf8}}```命令引入该包。
-                使用```\\setCJKmainfont{{PingFang SC}}  % 你可以根据自己的系统更改字体```命令设置中文字体。
-
-                CJK环境 是指通过在内容外部包裹 ```\\begin{{CJK}}{{UTF8}}{{gbsn}}``` 和 ```\\end{{CJK}}``` 这对命令，
-                您告诉LaTeX系统：此环境中的文本应使用UTF-8编码来处理，并使用特定的中文字体（例如 gbsn 适用于简体中文）。
+                为了中文支持，请将模版中```\usepackage[utf8]{{inputenc}}```替换为```\\usepackage{{ctex}}```。
                 这样就可以确保文档中的中文内容能够正确显示和排版。
 
                 ```{full_slides_temp_1}``` 是为课程：```{zero_shot_topic}```生成的latex格式幻灯片。
@@ -291,15 +280,10 @@ class Slides(PipelineStep):
                 """)
         elif(self.language == 'zh'):
             prompt_3 = ChatPromptTemplate.from_template(
-                """
+                r"""
                 需求: \n\n\n
                 注意：对于中文支持
-                在LaTeX中，CJKutf8包 是专门为排版CJK（中文、日文、韩文）字符设计的。
-                这意味着使用该包后，LaTeX在编译文档时可以正确处理中文文本，确保字符显示正确。通过```\\usepackage{{CJKutf8}}```命令引入该包。
-                使用```\\setCJKmainfont{{PingFang SC}}  % 你可以根据自己的系统更改字体```命令设置中文字体。
-
-                CJK环境 是指通过在内容外部包裹 ```\\begin{{CJK}}{{UTF8}}{{gbsn}}``` 和 ```\\end{{CJK}}``` 这对命令，
-                您告诉LaTeX系统：此环境中的文本应使用UTF-8编码来处理，并使用特定的中文字体（例如 gbsn 适用于简体中文）。
+                为了中文支持，请将模版中```\usepackage[utf8]{{inputenc}}```替换为```\\usepackage{{ctex}}```。
                 这样就可以确保文档中的中文内容能够正确显示和排版。
 
                 ```{full_slides_temp_2}``` 是为课程：```{zero_shot_topic}```生成的latex格式幻灯片。
@@ -343,15 +327,10 @@ class Slides(PipelineStep):
                 """)
         elif(self.language == 'zh'):
             prompt_4 = ChatPromptTemplate.from_template(
-                """
+                r"""
                 需求: \n\n\n
                 注意：对于中文支持
-                在LaTeX中，CJKutf8包 是专门为排版CJK（中文、日文、韩文）字符设计的。
-                这意味着使用该包后，LaTeX在编译文档时可以正确处理中文文本，确保字符显示正确。通过```\\usepackage{{CJKutf8}}```命令引入该包。
-                使用```\\setCJKmainfont{{PingFang SC}}  % 你可以根据自己的系统更改字体```命令设置中文字体。
-
-                CJK环境 是指通过在内容外部包裹 ```\\begin{{CJK}}{{UTF8}}{{gbsn}}``` 和 ```\\end{{CJK}}``` 这对命令，
-                您告诉LaTeX系统：此环境中的文本应使用UTF-8编码来处理，并使用特定的中文字体（例如 gbsn 适用于简体中文）。
+                为了中文支持，请将模版中```\usepackage[utf8]{{inputenc}}```替换为```\\usepackage{{ctex}}```。
                 这样就可以确保文档中的中文内容能够正确显示和排版。
 
                 对于latex ```{full_slides_temp_3}```，请检查latex语法和拼写错误。如果有，请修复。

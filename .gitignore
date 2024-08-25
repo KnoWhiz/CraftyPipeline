@@ -33,3 +33,5 @@ Crafty/pipeline/templates/0.synctex.gz
 *.fls
 *.aux
 *.fdb_latexmk
+*.md
+Crafty/pipeline/.DS_Store
