@@ -14,6 +14,7 @@ from Crafty.pipeline.slides import Slides
 from Crafty.pipeline.topic import Topic
 from Crafty.pipeline.video import Video
 from Crafty.pipeline.voice import Voice
+from Crafty.pipeline.utils.azure_blob import AzureBlobHelper
 
 CONFIG_FILE = "config.json"
 
@@ -34,6 +35,9 @@ def load_config(key):
             config = json.load(file)
         return config.get(key)
     return None
+
+azure_blob_helper = AzureBlobHelper()
+container_name = os.getenv('AZURE_CONTAINER_NAME')
 
 @click.group()
 def cli():
@@ -80,6 +84,7 @@ def create(topic, llm_source, temperature, creative_temperature, slides_template
     para['course_id'] = topic_step.course_id
     click.secho(f'Start generating chapters...', fg='green')
     Chapters(para).execute()
+
     click.secho(f'Start generating sections...', fg='green')
     section = Sections(para)
     section.execute()
@@ -166,6 +171,9 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
             chapter_step = Chapters(para)
             click.echo(f'Start generating chapters for Course ID: {para["course_id"]}...')
             chapter_step.execute()
+            folder_to_upload = os.path.join("outputs", para['course_id'])
+            azure_blob_helper.upload_directory(directory_path=folder_to_upload, container_name=container_name, blob_prefix=para['course_id'])
+    
             click.echo('Chapters are generated, please review the file and run next step with:')
             click.secho(f'python Crafty/cli.py step section --course_id {para["course_id"]} --sections_per_chapter 20', fg='green')
         else:
@@ -174,9 +182,13 @@ def step(step, topic, course_id, llm_source, temperature, creative_temperature, 
         if short_video:
             click.echo('Error: Section step is not required for short video. Please start with note step.')
         elif 'course_id' in para:
+            folder_to_download = "outputs"
+            azure_blob_helper.download_directory(container_name=container_name, blob_prefix=para['course_id'], local_base_dir=folder_to_download)
             click.echo(f'Generating sections for chapters with course_id {para["course_id"]}...')
             section_step = Sections(para)
             section_step.execute()
+            folder_to_upload = os.path.join("outputs", course_id)
+            azure_blob_helper.upload_directory(directory_path=folder_to_upload, container_name=container_name, blob_prefix=course_id)
             click.echo('Section are generated, please review the file and run next step with:')
             click.secho(f'python Crafty/cli.py step note --course_id {para["course_id"]} --max_note_expansion_words 500 --chapter 0', fg='green')
         else:

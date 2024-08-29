@@ -9,7 +9,7 @@ from langchain_core.output_parsers import XMLOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from Crafty.pipeline.pipeline_step import PipelineStep
-from Crafty.pipeline.utils.xml import XmlUtil
+from Crafty.pipeline.utils.xml_utils import XmlUtil
 
 
 class Notes(PipelineStep):
