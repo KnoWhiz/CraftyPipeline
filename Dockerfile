@@ -19,5 +19,3 @@ RUN pip install --no-cache-dir -r Crafty/requirements.txt
 
 WORKDIR /app/Crafty
 
-CMD ["python", "cli.py"]
-
