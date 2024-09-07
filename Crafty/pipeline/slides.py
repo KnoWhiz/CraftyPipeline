@@ -388,7 +388,8 @@ class Slides(PipelineStep):
         tex_name = f"full_slides_for_notes_set{notes_set_number}.tex"
         latex_file_path = os.path.join(os.path.abspath(self.videos_dir), tex_name)
         # Your command to run xelatex
-        command = ['/Library/TeX/texbin/xelatex', latex_file_path]
+        #command = ['/Library/TeX/texbin/xelatex', latex_file_path]
+        command = ['/usr/bin/xelatex', latex_file_path]
         # Run subprocess with cwd set to the directory of the .tex file
         with open(self.debug_dir + tex_name + '.log', 'w') as log:
             subprocess.run(command, cwd=os.path.dirname(latex_file_path), stdout=log)

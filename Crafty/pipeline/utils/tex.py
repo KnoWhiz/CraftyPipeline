@@ -83,7 +83,7 @@ class TexUtil:
         folder_path = 'templates'
         # Construct the full path to the file
         # full_path = f'./{folder_path}/{file_name}'
-        full_path = "Crafty/pipeline/templates/" + file_name
+        full_path = "pipeline/templates/" + file_name
         print("\nfull_path for pdf template: ", full_path)
         # Open the file and read its content
         try:

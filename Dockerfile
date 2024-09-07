@@ -5,6 +5,10 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     cmake \
+    texlive-xetex \
+    texlive-fonts-recommended \
+    texlive-latex-recommended \  
+    ffmpeg \ 
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
